@@ -28,7 +28,9 @@ function reportProgress() {
 		myProgress.currentLine++;    // set actual progress
 		socket.emit("progress_report", currentRaceID, currentUserID, myProgress);
 	}
-	setTimeout(reportProgress, 1000);
+	if (currentState !== States.WAITING_FOR_RACE) {
+		setTimeout(reportProgress, 1000);
+	}
 }
 
 // always check for progress
@@ -57,6 +59,7 @@ socket.on("start_race_timer", function(startTime) {
 	console.log("starting race timer");
 	currentRaceStartTimeMS = Date.parse(startTime);
 	showCountdown();
+	reportProgress();
 });
 
 socket.on("race_state", function(raceID, userProgressesJSON) {
