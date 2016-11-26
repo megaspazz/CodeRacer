@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script src="js/scripts.js"></script>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
-<link rel="icon" href="assets/favicon.ico"/>
-<link rel="stylesheet" type="text/css" href="css/styles.css">
+<link rel="icon" href="assets/favicon.ico" />
+<link rel="stylesheet" type="text/css" href="css/styles.css" />
 </head>
 <body>
 <div id="topbanner">
 	<img id="mainlogo" src="assets/coderacer.jpg"></img>
 </div>
 <div id="codebox" onmousedown="return false;" onselectstart="return false;">
-	<textarea readonly>Sample Code</textarea>
+	<textarea id="txtCode" readonly="readonly">Sample Code Goes Here</textarea>
 </div>
-<h1 onload="test();">Textbox</h1>
-
+<h1>Textbox</h1>
 <textarea></textarea>
+<div id="countdown"></div>
+<button id="btnTestServer">Test server pl0x</button>
+<button id="btnRequestRace">Request Race (TEST)</button>
 
+    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+	<script src="js/scripts.js"></script>
 </body>
 </html>
