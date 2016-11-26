@@ -27,7 +27,6 @@ http.listen(PORT, function() {
 
 
 
-
 io.on("connection", function(socket) {
 	console.log("+ CONNECTION");
 
@@ -42,6 +41,7 @@ io.on("connection", function(socket) {
 			};
 		}		
 		activeRaces[raceID].users[userID] = {
+			name: userID,    // make this the actual display name
 			connection: socket,
 			progress: null
 		}
@@ -52,10 +52,18 @@ io.on("connection", function(socket) {
 				time.setSeconds(time.getSeconds() + 5);
 				activeRaces[raceID].startTime = time;
 			}
+			
+			let usersInRace = [];
+			for (let userID in activeRaces[raceID].users) {
+				let user = activeRaces[raceID].users[userID];
+				usersInRace.push(user.name);
+			}
+			let usersInRaceJSON = JSON.stringify(usersInRace);
+			
 			let actualStartTime = activeRaces[raceID].startTime;
 			for (let userID in activeRaces[raceID].users) {
 				let user = activeRaces[raceID].users[userID];
-				user.connection.emit("start_race_timer", actualStartTime);
+				user.connection.emit("start_race_timer", actualStartTime, usersInRaceJSON);
 			}
 		}
 		//activeRaces[raceID].users[userID] = null;
