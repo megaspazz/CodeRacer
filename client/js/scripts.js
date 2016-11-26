@@ -21,6 +21,36 @@ var myProgress = {
 	totalLines: null
 };
 
+// roger's kool stuff
+// check user input, get progress, etc.
+var lines;
+
+$("usertextbox").keyup(function() {
+	var userText = $(this).val();
+	checkCorrectness(userText);
+}
+
+function checkCorrectness(text) {
+	let correct = false;
+	if (text.length <= lines[currentLine].length &&
+		text === lines[currentLine].substring(0, text.length)) {
+		correct = true;
+	}
+	if (correct) {
+		// make the box white or something
+		$("usertextbox").css({"color": "white"});
+	} else {
+		// make the box red or something
+		$("usertextbox").css({"color": "red"});
+	}
+}
+
+function getLines(text) {
+	lines = text.split("\n");
+}
+
+// end of roger's kool stuff
+
 function reportProgress() {
 	//console.log("reporting progress");
 	if (currentState === States.IN_RACE) {
@@ -94,8 +124,8 @@ socket.on("test_receive", function(txt) {
 
 
 
-var lines;
-var counter;
+//var lines;
+//var counter;
 
 function l(text) {
 	lines = text.split("\n");
