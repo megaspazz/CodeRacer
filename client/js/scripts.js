@@ -12,6 +12,8 @@ var currentState = States.NONE;
 var currentRaceID = null;
 var currentRaceText = null;
 var currentRaceStartTimeMS = null;
+var currentUsersInRace = null;
+var currentCountdownTimerID = null;
 
 var currentUserID = ~~(Math.random() * 1000000);    // initialize as the current user's ID
 console.log("user id = " + currentUserID);
@@ -33,18 +35,17 @@ function reportProgress() {
 	}
 }
 
-// always check for progress
-reportProgress();
-
-function showCountdown() {
+function updateCountdown() {
 	var currTime = new Date();
 	var remainingMS = currentRaceStartTimeMS - currTime.getTime();
 	if (remainingMS <= 0) {
+		// TODO: do other stuff to start the race
 		$("#countdown").text("");
 		currentState = States.IN_RACE;
 	} else {
+		// TODO: do nothing (?)
 		$("#countdown").text(remainingMS);
-		setTimeout(showCountdown, 100);
+		setTimeout(updateCountdown, 100);
 	}
 }
 
@@ -53,13 +54,25 @@ socket.on("found_race", function(raceID, raceText) {
 	currentState = States.WAITING_FOR_RACE;
 	currentRaceText = raceText;
 	currentRaceID = raceID;
+	// TODO: process the race text
 });
 
-socket.on("start_race_timer", function(startTime) {
+socket.on("start_race_timer", function(startTime, usersInRaceJSON) {
 	console.log("starting race timer");
+	
+	// start the countdown for the race start
 	currentRaceStartTimeMS = Date.parse(startTime);
-	showCountdown();
-	reportProgress();
+	updateCountdown();
+	reportProgress();    // only report progress when the race actually starts
+	
+	// reset the current users in the race
+	currentUsersInRace = { };
+	
+	// create a new object for users in the race
+	var usersInRace = JSON.parse(usersInRaceJSON);
+	for (var i = 0; i < usersInRace.length; i++) {
+		currentUsersInRace[usersInRace[i]] = { };
+	}
 });
 
 socket.on("race_state", function(raceID, userProgressesJSON) {
