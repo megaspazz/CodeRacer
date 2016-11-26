@@ -4,7 +4,8 @@ var socket = io();
 const States = {
 	NONE: 0,
 	WAITING_FOR_RACE: 1,
-	IN_RACE: 2
+	IN_RACE: 2,
+	FINISHED: 3
 };
 
 const Correctness = {
@@ -43,25 +44,32 @@ function checkUserInput(event) {
 			$("#usertextbox").val("");
 			deactivateLine(myProgress.currentLine);
 			myProgress.currentLine++;
-			activateLine(myProgress.currentLine);
+			if (myProgress.currentLine < myProgress.totalLines) {
+				activateLine(myProgress.currentLine);
+			} else {
+				currentState = States.FINISHED;
+				socket.emit("race_finished", currentRaceID, currentUserID);
+			}
 		}
 	} else {
 		if (correctness !== Correctness.WRONG) {
 			console.log("correct");
 			$("#usertextbox").removeClass("wrongLine");
+			$(currentRaceLineDivs[myProgress.currentLine]).removeClass("wrongCurrentLine");
 		} else {
 			console.log("wrong");
 			$("#usertextbox").addClass("wrongLine");
+			$(currentRaceLineDivs[myProgress.currentLine]).addClass("wrongCurrentLine");
 		}
 	}
 
 }
 
-function trollKey(event) {
+function delayKeyEvent(event) {
 	setTimeout(checkUserInput, 0, event);
 }
 
-$("#usertextbox").keydown(trollKey);
+$("#usertextbox").keydown(delayKeyEvent);
 
 //$("#usertextbox").keyup(checkUserInput);
 
@@ -90,11 +98,11 @@ function getLines(text) {
 
 function reportProgress() {
 	//console.log("reporting progress");
-	if (currentState === States.IN_RACE) {
+	if (currentState === States.IN_RACE || currentState === States.FINISHED) {
 		console.log("    in race!");
 		socket.emit("progress_report", currentRaceID, currentUserID, myProgress);
 	}
-	if (currentState !== States.WAITING_FOR_RACE) {
+	if (currentState !== States.NONE) {
 		setTimeout(reportProgress, 1000);
 	}
 }
@@ -174,15 +182,23 @@ socket.on("race_state", function(raceID, userProgressesJSON) {
 	for (var id in userProgresses) {
 		var progress = userProgresses[id];
 		if (progress) {
-			// update UI with other racers' progress
+			// @huboy update UI with other racers' progress
 			console.log(id + ": " + progress.currentLine + " / " + progress.totalLines);
 		}
 	}
 });
 
+socket.on("race_all_done", function(raceID) {
+	if (raceID === currentRaceID) {
+		currentState = States.NONE;
+	}
+});
+
+
 $("#btnRequestRace").click(function() {
 	socket.emit("race_request", currentUserID);
 });
+
 
 
 

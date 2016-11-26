@@ -1,5 +1,4 @@
 public boolean find(int[][] matrix, int num) {
-
 	int rLen = matrix.length;
 	int cLen = matrix[0].length;
 
