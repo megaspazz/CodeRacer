@@ -5,6 +5,9 @@ var app = express();
 var http = require("http").Server(app);
 var io = require("socket.io")(http);
 
+// filesystem
+var fs = require("fs");
+
 const PORT = 1997;
 
 const CLIENT_PATH = path.resolve(__dirname + "/../client");
@@ -33,13 +36,15 @@ io.on("connection", function(socket) {
 	socket.on("race_request", function(userID) {
 		console.log("got race request");
 		let raceID = 1997;
-		let raceText = "lorem ipsum\nherp derp";
+		//let raceText = "lorem ipsum\nherp derp";
+		let raceText = fs.readFileSync(__dirname + "/race_texts/test_race.java", "utf8");
+		socket.emit("found_race", raceID, raceText);
 		if (!activeRaces[raceID]) {
 			activeRaces[raceID] = {
 				users: { },
 				startTime: null
 			};
-		}		
+		}
 		activeRaces[raceID].users[userID] = {
 			name: userID,    // make this the actual display name
 			connection: socket,
@@ -66,9 +71,6 @@ io.on("connection", function(socket) {
 				user.connection.emit("start_race_timer", actualStartTime, usersInRaceJSON);
 			}
 		}
-		//activeRaces[raceID].users[userID] = null;
-		//activeRaces[raceID].started = true;
-		socket.emit("found_race", raceID, raceText);
 	});
 	
 	socket.on("progress_report", function(raceID, userID, progress) {
@@ -87,6 +89,13 @@ io.on("connection", function(socket) {
 		console.log("- DISCONNECTION");
 	});
 	
+	socket.on("race_finished", function(raceID, userID) {
+		console.log("race finished");
+		// do some statistics things or something
+		// robon shud do this
+		// destroy race
+		
+	});
 	
 	
 	

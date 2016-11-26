@@ -7,10 +7,17 @@ const States = {
 	IN_RACE: 2
 };
 
+const Correctness = {
+	WRONG: 0,
+	PARTIAL: 1,
+	CORRECT: 2
+}
+
 var currentState = States.NONE;
 
 var currentRaceID = null;
-var currentRaceText = null;
+var currentRaceLines = null;
+var currentRaceLineDivs = null;
 var currentRaceStartTimeMS = null;
 var currentUsersInRace = null;
 var currentCountdownTimerID = null;
@@ -25,30 +32,58 @@ var myProgress = {
 
 // roger's kool stuff
 // check user input, get progress, etc.
-var lines;
 
-$("usertextbox").keyup(function() {
-	var userText = $(this).val();
-	checkCorrectness(userText);
+function checkUserInput(event) {
+	var keyCode = event.keyCode || event.which;
+	console.log("got user input");
+	var userText = $("#usertextbox").val();
+	var correctness = checkCorrectness(userText);
+	if (keyCode === 13) {
+		if (correctness === Correctness.CORRECT) {
+			$("#usertextbox").val("");
+			deactivateLine(myProgress.currentLine);
+			myProgress.currentLine++;
+			activateLine(myProgress.currentLine);
+		}
+	} else {
+		if (correctness !== Correctness.WRONG) {
+			console.log("correct");
+			$("#usertextbox").removeClass("wrongLine");
+		} else {
+			console.log("wrong");
+			$("#usertextbox").addClass("wrongLine");
+		}
+	}
+
 }
 
+function trollKey(event) {
+	setTimeout(checkUserInput, 0, event);
+}
+
+$("#usertextbox").keydown(trollKey);
+
+//$("#usertextbox").keyup(checkUserInput);
+
+//$("#usertextbox").keydown(checkUserInput);
+
 function checkCorrectness(text) {
-	let correct = false;
-	if (text.length <= lines[currentLine].length &&
-		text === lines[currentLine].substring(0, text.length)) {
-		correct = true;
-	}
-	if (correct) {
-		// make the box white or something
-		$("usertextbox").css({"color": "white"});
+	var trimmedLine = currentRaceLines[myProgress.currentLine].trim();
+	console.log("text = " + text + ", trimmed = " + trimmedLine);
+	if (text.length > trimmedLine.length || text !== trimmedLine.substring(0, text.length)) {
+		console.log("  > WRONG");
+		return Correctness.WRONG;
+	} else if (text.length !== trimmedLine.length) {
+		console.log("  > partial");
+		return Correctness.PARTIAL;
 	} else {
-		// make the box red or something
-		$("usertextbox").css({"color": "red"});
+		console.log("  > CORREENT");
+		return Correctness.CORRECT;
 	}
 }
 
 function getLines(text) {
-	lines = text.split("\n");
+	return text.split(/\r?\n/g);
 }
 
 // end of roger's kool stuff
@@ -57,12 +92,27 @@ function reportProgress() {
 	//console.log("reporting progress");
 	if (currentState === States.IN_RACE) {
 		console.log("    in race!");
-		myProgress.currentLine++;    // set actual progress
 		socket.emit("progress_report", currentRaceID, currentUserID, myProgress);
 	}
 	if (currentState !== States.WAITING_FOR_RACE) {
 		setTimeout(reportProgress, 1000);
 	}
+}
+
+function activateLine(activeLine) {
+	var activeDiv = currentRaceLineDivs[activeLine];
+	activeDiv.addClass("currentLine");
+	var currentText = activeDiv.text();
+	var newText = ">" + currentText.substring(1);
+	activeDiv.text(newText);
+}
+
+function deactivateLine(inactiveLine) {
+	var inactiveDiv = currentRaceLineDivs[inactiveLine];
+	inactiveDiv.removeClass("currentLine");
+	var currentText = inactiveDiv.text();
+	var newText = "\xA0" + currentText.substring(1);
+	inactiveDiv.text(newText);
 }
 
 function updateCountdown() {
@@ -72,6 +122,15 @@ function updateCountdown() {
 		// TODO: do other stuff to start the race
 		$("#countdown").text("");
 		currentState = States.IN_RACE;
+		//$("#txtCode").text(currentRaceText);
+		for (var i = 0; i < currentRaceLineDivs.length; i++) {
+			$("#codebox").append(currentRaceLineDivs[i]);
+		}
+		myProgress = {
+			currentLine: 0,
+			totalLines: currentRaceLines.length
+		};
+		activateLine(0);
 	} else {
 		// TODO: do nothing (?)
 		$("#countdown").text(remainingMS);
@@ -82,7 +141,11 @@ function updateCountdown() {
 socket.on("found_race", function(raceID, raceText) {
 	console.log("got request to start race from server");
 	currentState = States.WAITING_FOR_RACE;
-	currentRaceText = raceText;
+	currentRaceLines = getLines(raceText);
+	currentRaceLineDivs = currentRaceLines.map(function(line) {
+		var divContent = line.replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;") || "&nbsp;";
+		return $("<div>&nbsp;&nbsp;" + divContent + "</div>");
+	});
 	currentRaceID = raceID;
 	// TODO: process the race text
 });
@@ -137,20 +200,8 @@ socket.on("test_receive", function(txt) {
 
 
 
-//var lines;
-//var counter;
-
-function l(text) {
-	lines = text.split("\n");
-}
+// what does this do
 
 function test() {
 	$(document).ready
-}
-
-function check(input) {
-	if(input.length > lines[counter])
-	{
-		
-	}
 }
