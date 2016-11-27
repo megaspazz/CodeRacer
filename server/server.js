@@ -8,6 +8,8 @@ var io = require("socket.io")(http);
 // filesystem
 var fs = require("fs");
 
+const PRE_RACE_TIME = 10000;
+
 const PORT = 1997;
 
 const CLIENT_PATH = path.resolve(__dirname + "/../client");
@@ -31,14 +33,28 @@ http.listen(PORT, function() {
 
 
 
+function getUserProgresses(raceID) {
+	let userProgresses = { };
+	for (let userID in activeRaces[raceID].users) {
+		userProgresses[userID] = activeRaces[raceID].users[userID].progress;
+	}
+	return userProgresses;
+}
+
+function getStartRaceFunction(sock) {
+	return function() {
+		sock.emit("start_race");
+	}
+}
+
+
+
 
 io.on("connection", function(socket) {
 	console.log("+ CONNECTION");
 
-	socket.on("race_request", function(userID) {
+	socket.on("race_request", function(raceID, userID) {
 		console.log("got race request");
-
-		let raceID = 1997;
 
 
 
@@ -69,13 +85,14 @@ io.on("connection", function(socket) {
 			name: userID,    // make this the actual display name
 			connection: socket,
 			progress: null,
+			started: false,
 			finishTime: NaN
 		}
 		console.log(Object.keys(activeRaces[raceID].users).length);
 		if (Object.keys(activeRaces[raceID].users).length >= 2) {
 			if (!activeRaces[raceID].startTime) {
-				let time = new Date();
-				time.setSeconds(time.getSeconds() + 5);
+				let now = Date.now();
+				var time = now + PRE_RACE_TIME;
 				activeRaces[raceID].startTime = time;
 			}
 			
@@ -84,12 +101,18 @@ io.on("connection", function(socket) {
 				let user = activeRaces[raceID].users[userID];
 				usersInRace.push(user.name);
 			}
-			let usersInRaceJSON = JSON.stringify(usersInRace);
 			
-			let actualStartTime = activeRaces[raceID].startTime;
 			for (let userID in activeRaces[raceID].users) {
 				let user = activeRaces[raceID].users[userID];
-				user.connection.emit("start_race_timer", actualStartTime, usersInRaceJSON);
+				if (!user.started) {
+					user.started = true;
+					let now = Date.now();
+					let remainingTime = Math.max(0, activeRaces[raceID].startTime - now);
+					let startRaceFn = getStartRaceFunction(user.connection);
+					setTimeout(startRaceFn, remainingTime);
+					console.log("remaining time = " + remainingTime);
+					user.connection.emit("start_race_timer", remainingTime, usersInRace);
+				}
 			}
 		}
 	});
@@ -102,12 +125,8 @@ io.on("connection", function(socket) {
 		}
 
 		activeRaces[raceID].users[userID].progress = progress;
-		let userProgresses = { };
-		for (let userID in activeRaces[raceID].users) {
-			userProgresses[userID] = activeRaces[raceID].users[userID].progress;
-		}
-		let userProgressesJSON = JSON.stringify(userProgresses);
-		socket.emit("race_state", raceID, userProgressesJSON);
+		let userProgresses = getUserProgresses(raceID);
+		socket.emit("race_state", raceID, userProgresses);
 	});
 
 	socket.on("disconnect", function() {
@@ -116,8 +135,8 @@ io.on("connection", function(socket) {
 	
 	socket.on("race_finished", function(raceID, userID) {
 		console.log("race finished");
-		let now = new Date();
-		let duration = now.getTime() - activeRaces[raceID].startTime.getTime();
+		let now = Date.now();
+		let duration = now - activeRaces[raceID].startTime;
 		activeRaces[raceID].users[userID].finishTime = duration;
 		activeRaces[raceID].users[userID].progress.currentLine = activeRaces[raceID].users[userID].progress.totalLines;
 		console.log("!!! " + userID + " FINISHED !!!");
@@ -136,7 +155,8 @@ io.on("connection", function(socket) {
 			console.log("*** " + raceID + " ALL DONE ***");
 			for (let id in activeRaces[raceID].users) {
 				let user = activeRaces[raceID].users[id];
-				user.connection.emit("race_all_done", raceID);
+				let userProgresses = getUserProgresses(raceID);
+				user.connection.emit("race_all_done", raceID, userProgresses);
 			}
 			delete activeRaces[raceID];
 		}

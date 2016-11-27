@@ -23,7 +23,9 @@ var currentRaceStartTimeMS = null;
 var currentUsersInRace = null;
 var currentCountdownTimerID = null;
 
-var currentUserID = ~~(Math.random() * 1000000);    // initialize as the current user's ID
+var countdownIntervalID = null;
+
+var currentUserID = ~~(Math.random() * 1000000000);    // initialize as the current user's ID
 console.log("user id = " + currentUserID);
 
 var myProgress = {
@@ -36,28 +38,28 @@ var myProgress = {
 
 function checkUserInput(event) {
 	var keyCode = event.keyCode || event.which;
-	console.log("got user input");
 	var userText = $("#usertextbox").val();
 	var correctness = checkCorrectness(userText);
 	if (keyCode === 13) {
 		if (correctness === Correctness.CORRECT) {
-			$("#usertextbox").val("");
+			var usertextbox = $("#usertextbox");
+			usertextbox.val("");
 			deactivateLine(myProgress.currentLine);
 			myProgress.currentLine++;
 			if (myProgress.currentLine < myProgress.totalLines) {
 				activateLine(myProgress.currentLine);
 			} else {
+				usertextbox.prop("disabled", true);
+				$("#btnRequestRace").prop("disabled", false);
 				currentState = States.FINISHED;
 				socket.emit("race_finished", currentRaceID, currentUserID);
 			}
 		}
 	} else {
 		if (correctness !== Correctness.WRONG) {
-			console.log("correct");
 			$("#usertextbox").removeClass("wrongLine");
 			$(currentRaceLineDivs[myProgress.currentLine]).removeClass("wrongCurrentLine");
 		} else {
-			console.log("wrong");
 			$("#usertextbox").addClass("wrongLine");
 			$(currentRaceLineDivs[myProgress.currentLine]).addClass("wrongCurrentLine");
 		}
@@ -77,15 +79,11 @@ $("#usertextbox").keydown(delayKeyEvent);
 
 function checkCorrectness(text) {
 	var trimmedLine = currentRaceLines[myProgress.currentLine].trim();
-	console.log("text = " + text + ", trimmed = " + trimmedLine);
 	if (text.length > trimmedLine.length || text !== trimmedLine.substring(0, text.length)) {
-		console.log("  > WRONG");
 		return Correctness.WRONG;
 	} else if (text.length !== trimmedLine.length) {
-		console.log("  > partial");
 		return Correctness.PARTIAL;
 	} else {
-		console.log("  > CORREENT");
 		return Correctness.CORRECT;
 	}
 }
@@ -126,59 +124,68 @@ function deactivateLine(inactiveLine) {
 function updateCountdown() {
 	var currTime = new Date();
 	var remainingMS = currentRaceStartTimeMS - currTime.getTime();
-	if (remainingMS <= 0) {
-		// TODO: do other stuff to start the race
-		$("#countdown").text("");
-		currentState = States.IN_RACE;
-		//$("#txtCode").text(currentRaceText);
-		for (var i = 0; i < currentRaceLineDivs.length; i++) {
-			$("#codebox").append(currentRaceLineDivs[i]);
-		}
-		myProgress = {
-			currentLine: 0,
-			totalLines: currentRaceLines.length
-		};
-		activateLine(0);
-	} else {
-		// TODO: do nothing (?)
-		$("#countdown").text(remainingMS);
-		setTimeout(updateCountdown, 100);
-	}
+	$("#countdown").text(remainingMS);
 }
 
 socket.on("found_race", function(raceID, raceText) {
 	console.log("got request to start race from server");
+	currentRaceID = raceID;
 	currentState = States.WAITING_FOR_RACE;
 	currentRaceLines = getLines(raceText);
 	currentRaceLineDivs = currentRaceLines.map(function(line) {
 		var divContent = line.replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;") || "&nbsp;";
 		return $("<div>&nbsp;&nbsp;" + divContent + "</div>");
 	});
-	currentRaceID = raceID;
-	// TODO: process the race text
+	$("#btnRequestRace").prop("disabled", true);
+	$("#codebox").empty();
+	$("#countdown").text("waiting for competitors to join...");
 });
 
-socket.on("start_race_timer", function(startTime, usersInRaceJSON) {
+socket.on("start_race_timer", function(countdownTime, usersInRace) {
 	console.log("starting race timer");
 	
-	// start the countdown for the race start
-	currentRaceStartTimeMS = Date.parse(startTime);
-	updateCountdown();
-	reportProgress();    // only report progress when the race actually starts
-	
-	// reset the current users in the race
-	currentUsersInRace = { };
-	
-	// create a new object for users in the race
-	var usersInRace = JSON.parse(usersInRaceJSON);
-	for (var i = 0; i < usersInRace.length; i++) {
-		currentUsersInRace[usersInRace[i]] = { };
+	if (!countdownIntervalID) {
+		console.log("actually starting race timer");
+		
+		// start the countdown for the race start
+		var now = Date.now();
+		currentRaceStartTimeMS = new Date(now + countdownTime);
+		countdownIntervalID = setInterval(updateCountdown, 40);
+		reportProgress();    // only report progress when the race actually starts
+		
+		// reset the current users in the race
+		currentUsersInRace = { };
+		
+		// create a new object for users in the race
+		for (var i = 0; i < usersInRace.length; i++) {
+			currentUsersInRace[usersInRace[i]] = { };
+		}
 	}
 });
 
-socket.on("race_state", function(raceID, userProgressesJSON) {
-	console.log("got race state");
-	var userProgresses = JSON.parse(userProgressesJSON);
+socket.on("start_race", function() {
+	clearInterval(countdownIntervalID);
+	countdownIntervalID = null;
+	
+	$("#countdown").text("");
+	currentState = States.IN_RACE;
+	//$("#txtCode").text(currentRaceText);
+	var codebox = $("#codebox");
+	for (var i = 0; i < currentRaceLineDivs.length; i++) {
+		codebox.append(currentRaceLineDivs[i]);
+	}
+	myProgress = {
+		currentLine: 0,
+		totalLines: currentRaceLines.length
+	};
+	activateLine(0);
+	var usertextbox = $("#usertextbox");
+	usertextbox.prop("disabled", false);
+	usertextbox.text("");
+	usertextbox.focus();
+});
+
+function updateProgresses(userProgresses) {
 	for (var id in userProgresses) {
 		var progress = userProgresses[id];
 		if (progress) {
@@ -186,17 +193,26 @@ socket.on("race_state", function(raceID, userProgressesJSON) {
 			console.log(id + ": " + progress.currentLine + " / " + progress.totalLines);
 		}
 	}
+}
+
+socket.on("race_state", function(raceID, userProgresses) {
+	console.log("got race state");
+	updateProgresses(userProgresses);
 });
 
-socket.on("race_all_done", function(raceID) {
+socket.on("race_all_done", function(raceID, userProgresses) {
+	console.log("race all done from server!");
 	if (raceID === currentRaceID) {
+		// do end-of-race things here
+		updateProgresses(userProgresses);
 		currentState = States.NONE;
 	}
 });
 
 
 $("#btnRequestRace").click(function() {
-	socket.emit("race_request", currentUserID);
+	var raceID = prompt("Enter the race ID you want to join:", 1997);
+	socket.emit("race_request", raceID, currentUserID);
 });
 
 
