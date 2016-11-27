@@ -51,6 +51,7 @@ function checkUserInput(event) {
 			} else {
 				usertextbox.prop("disabled", true);
 				$("#btnRequestRace").prop("disabled", false);
+				$("#btnQuitRace").prop("disabled", true);
 				currentState = States.FINISHED;
 				socket.emit("race_finished", currentRaceID, currentUserID);
 			}
@@ -137,6 +138,7 @@ socket.on("found_race", function(raceID, raceText) {
 		return $("<div>&nbsp;&nbsp;" + divContent + "</div>");
 	});
 	$("#btnRequestRace").prop("disabled", true);
+	$("#btnQuitRace").prop("disabled", false);
 	$("#codebox").empty();
 	$("#countdown").text("waiting for competitors to join...");
 });
@@ -209,11 +211,29 @@ socket.on("race_all_done", function(raceID, userProgresses) {
 	}
 });
 
+socket.on("after_quit_race", function() {
+	currentState = States.NONE;
+	$("#usertextbox").prop("disabled", true);
+	$("#btnRequestRace").prop("disabled", false);
+	$("#btnQuitRace").prop("disabled", true);
+	$("#codebox").empty();
+});
 
 $("#btnRequestRace").click(function() {
 	var raceID = prompt("Enter the race ID you want to join:", 1997);
-	socket.emit("race_request", raceID, currentUserID);
+	if (raceID) {
+		socket.emit("race_request", raceID, currentUserID);
+	}
 });
+
+function quitRace() {
+	socket.emit("quit_race", currentRaceID, currentUserID);
+}
+
+$("#btnQuitRace").click(quitRace);
+
+$(window).on("beforeunload", quitRace);
+
 
 
 

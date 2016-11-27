@@ -8,6 +8,13 @@ var io = require("socket.io")(http);
 // filesystem
 var fs = require("fs");
 
+const UserStates = {
+	NONE: 0,
+	STARTED: 1,
+	FINISHED: 2,
+	QUIT: 3
+}
+
 const PRE_RACE_TIME = 10000;
 
 const PORT = 1997;
@@ -47,7 +54,26 @@ function getStartRaceFunction(sock) {
 	}
 }
 
-
+function checkRaceCompleted(raceID) {
+	let done = true;
+	for (let id in activeRaces[raceID].users) {
+		let userState = activeRaces[raceID].users[id].state;
+		if (userState === UserStates.NONE || userState === UserStates.STARTED) {
+			done = false;
+			break;
+		}
+	}
+	if (done) {
+		// robon saves match into history table
+		console.log("*** " + raceID + " ALL DONE ***");
+		for (let id in activeRaces[raceID].users) {
+			let user = activeRaces[raceID].users[id];
+			let userProgresses = getUserProgresses(raceID);
+			user.connection.emit("race_all_done", raceID, userProgresses);
+		}
+		delete activeRaces[raceID];
+	}
+}
 
 
 io.on("connection", function(socket) {
@@ -85,7 +111,7 @@ io.on("connection", function(socket) {
 			name: userID,    // make this the actual display name
 			connection: socket,
 			progress: null,
-			started: false,
+			state: UserStates.NONE,
 			finishTime: NaN
 		}
 		console.log(Object.keys(activeRaces[raceID].users).length);
@@ -104,8 +130,8 @@ io.on("connection", function(socket) {
 			
 			for (let userID in activeRaces[raceID].users) {
 				let user = activeRaces[raceID].users[userID];
-				if (!user.started) {
-					user.started = true;
+				if (user.state === UserStates.NONE) {
+					user.started = UserStates.STARTED;
 					let now = Date.now();
 					let remainingTime = Math.max(0, activeRaces[raceID].startTime - now);
 					let startRaceFn = getStartRaceFunction(user.connection);
@@ -133,33 +159,32 @@ io.on("connection", function(socket) {
 		console.log("- DISCONNECTION");
 	});
 	
+	socket.on("quit_race", function(raceID, userID) {
+		if (activeRaces[raceID]) {
+			let user = activeRaces[raceID].users[userID];
+			if (!user.finishTime) {
+				// if the user didn't finish the race we should record it in the stats
+				user.state = UserStates.QUIT;
+				user.connection.emit("after_quit_race");
+				checkRaceCompleted(raceID);
+			}
+		} else {
+			console.log("warning: tried to quit a nonexistent race!");
+		}
+	});
+	
 	socket.on("race_finished", function(raceID, userID) {
 		console.log("race finished");
 		let now = Date.now();
 		let duration = now - activeRaces[raceID].startTime;
 		activeRaces[raceID].users[userID].finishTime = duration;
 		activeRaces[raceID].users[userID].progress.currentLine = activeRaces[raceID].users[userID].progress.totalLines;
+		activeRaces[raceID].users[userID].state = UserStates.FINISHED;
 		console.log("!!! " + userID + " FINISHED !!!");
 		// robon does individual user statistics
 		//
 		//
-		let done = true;
-		for (let id in activeRaces[raceID].users) {
-			if (!activeRaces[raceID].users[id].finishTime) {
-				done = false;
-				break;
-			}
-		}
-		if (done) {
-			// robon saves match into history table
-			console.log("*** " + raceID + " ALL DONE ***");
-			for (let id in activeRaces[raceID].users) {
-				let user = activeRaces[raceID].users[id];
-				let userProgresses = getUserProgresses(raceID);
-				user.connection.emit("race_all_done", raceID, userProgresses);
-			}
-			delete activeRaces[raceID];
-		}
+		checkRaceCompleted(raceID);
 	});
 	
 	
