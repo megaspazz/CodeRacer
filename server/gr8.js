@@ -162,18 +162,19 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 								return;
 							}
 							console.log("SUCCESS: addRaceToHistory: updateOne: history: ", "<opt. result text>");
-							let sum = 0;
-							let sum10 = 0;
-							let num10 = 0;
-							// PROBLEM: modifying wrong doc; need to get handle of new doc
-							for (let j = num; j >= 0; j--) {
-								if (j >= num - 10) {
-									sum10 += (doc.history)[j].wpm;
+							let sum = historyEntry.wpm;
+							let sum10 = historyEntry.wpm;
+							let num10 = 1;
+							// note that "num" and "doc" refer to the document prior to pushing
+							// which is why we manually add the most recent document above
+							for (let j = num - 1; j >= 0; j--) {
+								if (num10 < 10) {
+									sum10 += doc.history[j].wpm;
 									num10++;
 								}
-								sum += (doc.history[j]).wpm;
+								sum += doc.history[j].wpm;
 							}
-							let lifetimeWpm = sum / num;
+							let lifetimeWpm = sum / (num + 1);
 							let pastTenWpm = sum10 / num10;
 							let newStats = {
 								wpm: lifetimeWpm,
