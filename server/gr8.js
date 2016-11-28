@@ -7,21 +7,12 @@ addUser("eric", "megaspazz", "erik@somewhere.com", "weird");
 updateUserDisplayName("eric", "erik");
 updateUserEmail("erik", "updated@gmail.com");
 updateUserPassword("erik", "newPass");
+
 addRaceToHistory(["Guest", "Guest", "eric"],
 	[3, 2, 1],
 	[20, 30, 300],
 	[15, 20, 100],
 	"de_dust2");
-
-// PROBLEM: can't use genericCallback because it can't reference db to close it
-
-function genericCallback(err, result) {
-	if (err) {
-		console.log("something went wrong: ", err);
-	} else {
-		console.log("something went right: ", "<result can go here if you want>");
-	}
-}
 
 // TODO: for all functions, first verify validity of args
 	// when updating user, verify user exists? current implementation is
@@ -33,24 +24,32 @@ function genericCallback(err, result) {
 function addUser(uname, dispName, userEmail, pass) {
 	MongoClient.connect(url, null, (err, db) => {
 		if (err) {
-			console.log("addUser: unable to connect: ", err);
-		} else {
-			console.log("addUser: connection established: ", url);
-			let collection = db.collection("users");
-			let today = new Date();
-			let newStats = { wpm: 0, wpm10: 0, numRaces: 0 };
-			let hist = [];
-			let user = {
-				username: uname,
-				displayName: dispName,
-				email: userEmail,
-				password: pass,
-				joinDate: today,
-				stats: newStats,
-				history: hist
-			};
-			collection.insertOne(user, null, genericCallback);
+			console.log("ERROR: addUser: connect: ", err);
+			return;
 		}
+		console.log("SUCCESS: addUser: connect: ", url);
+		let collection = db.collection("users");
+		let today = new Date();
+		let newStats = { wpm: 0, wpm10: 0, numRaces: 0 };
+		let hist = [];
+		let user = {
+			username: uname,
+			displayName: dispName,
+			email: userEmail,
+			password: pass,
+			joinDate: today,
+			stats: newStats,
+			history: hist
+		};
+		collection.insertOne(user, null, (err, result) => {
+			if (err) {
+				console.log("ERROR: addUser: insertOne: ", err);
+				db.close();
+				return;
+			}
+			console.log("SUCCESS: addUser: insertOne: ", "<opt. result text>");
+			db.close();
+		});
 	});
 }
 
@@ -58,14 +57,22 @@ function addUser(uname, dispName, userEmail, pass) {
 function updateUserDisplayName(uname, dispName) {
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
-			console.log("updateUserDisplayName: unable to connect: ", err);
-		} else {
-			console.log("updateUserDisplayName: connection established: ", url);
-			let collection = db.collection("users");
-			collection.updateOne({ username: uname },
-				{ $set: { displayName: dispName } },
-				genericCallback);
-		}
+			console.log("ERROR: updateUserDisplayName: connect: ", err);
+			return;
+		} 
+		console.log("SUCCESS: updateUserDisplayName: connect: ", url);
+		let collection = db.collection("users");
+		collection.updateOne({ username: uname },
+			{ $set: { displayName: dispName } },
+			(err, result) => {
+				if (err) {
+					console.log("ERROR: updateUserDisplayName: updateOne: ", err);
+					db.close();
+					return;
+				}
+				console.log("SUCCESS: updateUserDisplayName: updateOne: ", "<opt. result text>");
+				db.close();
+			});
 	});
 }
 
@@ -73,14 +80,22 @@ function updateUserDisplayName(uname, dispName) {
 function updateUserEmail(uname, userEmail) {
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
-			console.log("updateUserEmail: unable to connect: ", err);
-		} else {
-			console.log("updateUserEmail: connection established: ", url);
-			let collection = db.collection("users");
-			collection.updateOne({ username: uname },
-				{ $set: { email: userEmail } },
-				genericCallback);
-		}
+			console.log("ERROR: updateUserEmail: connect: ", err);
+			return;
+		} 
+		console.log("SUCCESS: updateUserEmail: connect: ", url);
+		let collection = db.collection("users");
+		collection.updateOne({ username: uname },
+			{ $set: { email: userEmail } },
+			(err, result) => {
+				if (err) {
+					console.log("ERROR: updateUserEmail: updateOne: ", err);
+					db.close();
+					return;
+				}
+				console.log("SUCCESS: updateUserEmail: updateOne: ", "<opt. result text>");
+				db.close();
+			});
 	});
 }
 
@@ -88,86 +103,75 @@ function updateUserEmail(uname, userEmail) {
 function updateUserPassword(uname, pass) {
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
-			console.log("updateUserPassword: unable to connect: ", err);
-		} else {
-			console.log("updateUserPassword: connection established: ", url);
-			let collection = db.collection("users");
-			collection.updateOne({ username: uname },
-				{ $set: { password: pass } },
-				genericCallback);
+			console.log("ERROR: updateUserPassword: connect: ", err);
+			return;
 		}
+		console.log("SUCCESS: updateUserPassword: connect: ", url);
+		let collection = db.collection("users");
+		collection.updateOne({ username: uname },
+			{ $set: { password: pass } },
+			(err, result) => {
+				if (err) {
+					console.log("ERROR: updateUserPassword: updateOne: ", err);
+					db.close();
+					return;
+				}
+				console.log("SUCCESS: updateUserPassword: updateOne: ", "<opt. result text>");
+				db.close();
+			});
 	});
 }
 
 function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
-			console.log("addRaceToHistory: unable to connect: ", err);
+			console.log("ERROR: addRaceToHistory: connect: ", err);
 			return;
 		}
-		console.log("addRaceToHistory: connection established: ", url);
+		console.log("SUCCESS: addRaceToHistory: connect: ", url);
 		let collection = db.collection("users");
-		// TODO: add race to global list
-		for (let i = 0; i < racers.length; i++) {
-			if (racers[i] === "Guest") {
-				continue;
-			}
-			// collection.findOne({ username: "eric" }, null, genericCallback);
-		}
-		db.close();
-	});
-}
-
-/*
-function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
-	MongoClient.connect(url, (err, db) => {
-		if (err) {
-			console.log("addRaceToHistory: unable to connect: ", err);
-			return;
-		}
-		console.log("addRaceToHistory: connection established: ", url);
-		let collection = db.collection("users");
-		// TODO: add race to global list
+		let today = new Date();
 		for (let i = 0; i < racers.length; i++) {
 			if (racers[i] === "Guest") {
 				continue;
 			}
 			collection.findOne({ username: racers[i] },
-				null,
 				(err, doc) => {
 					if (err) {
-						console.log("addRaceToHistory: findError: ", err);
+						console.log("ERROR: addRaceToHistory: findOne: ", err);
+						db.close();
 						return;
-					}
-					let today = new Date();
+					} 
+					console.log("SUCCESS: addRaceToHistory: findOne: ", "<opt. result text>");
 					let num = doc.history.length;
-					historyEntry = {
+					let historyEntry = {
 						participants: racers,
-						rank: rankings[2],
-						wpm: wpms[2],
-						accuracy: accuracies[2],
+						rank: rankings[i],
+						wpm: wpms[i],
+						accuracy: accuracies[i],
 						title: textTitle,
-						raceNumber: num,
+						raceNumber: num + 1,
 						date: today
 					};
-					collection.updateOne({ username: racers[2] },
+					collection.updateOne( {username: racers[i] },
 						{ $push: { history: historyEntry } },
 						(err, result) => {
 							if (err) {
-								console.log("rip");
+								console.log("ERROR: addRaceToHistory: updateOne: history: ", err);
+								db.close();
 								return;
 							}
+							console.log("SUCCESS: addRaceToHistory: updateOne: history: ", "<opt. result text>");
 							let sum = 0;
 							let sum10 = 0;
-							let num = doc.stats.numRaces;
 							let num10 = 0;
-							let len = docs.history.length;
-							for (let j = len - 1; j >= 0; j--) {
-								if (j >= len - 10) {
-									sum10 += docs.history[j].wpm;
+							// PROBLEM: modifying wrong doc; need to get handle of new doc
+							for (let j = num; j >= 0; j--) {
+								if (j >= num - 10) {
+									sum10 += (doc.history)[j].wpm;
 									num10++;
 								}
-								sum += docs.history[j].wpm;
+								sum += (doc.history[j]).wpm;
 							}
 							let lifetimeWpm = sum / num;
 							let pastTenWpm = sum10 / num10;
@@ -176,81 +180,22 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 								wpm10: pastTenWpm,
 								numRaces: num
 							};
-							collection.updateOne({ username: racers[i] },
-								{ $set: { stats: newStats } },
-								genericCallback);
+							collection.updateOne( { username: racers[i] },
+								{ $set: {stats: newStats } },
+								(err, result) => {
+									if (err) {
+										console.log("ERROR: addRaceToHistory: updateOne: stats: ", err);
+										db.close();
+										return;
+									}
+									console.log("SUCCESS: addRaceToHistory: updateOne: stats: ", "<opt. result text>");
+									if (i == racers.length - 1) {
+										// PROBLEM: won't be reached if last is guest
+										db.close();
+									}
+								})
 						});
 				});
 		}
 	});
 }
-*/
-
-// add entry to user history
-// NOTE currently does not update stats
-/*
-function addRaceToHistory(racers, rankings, wpms, accuracies) {
-	MongoClient.connect(url, (err, db) => {
-		if (err) {
-			console.log("addRaceToHistory: unable to connect: ", err);
-		} else {
-			console.log("addRaceToHistory: connection established: ", url);
-			let collection = db.collection("users");
-			for (let i = 0; i < racers.length; i++) {
-				if (racers[i] === "Guest") {
-					continue;
-				}
-				collection.findOne({ username: racers[i] },
-					null,
-					(err, doc) => {
-						if (err) {
-							console.log("rip");
-							return;
-						}
-						let today = new Date();
-						let num = doc.history.length;
-						historyEntry = {
-							participants: racers,
-							rank: rankings[i],
-							wpm: wpms[i],
-							accuracy: accuracies[i],
-							date: today,
-							raceNumber: num
-						};
-						collection.updateOne({ username: racers[i] },
-							{ $push: { history: historyEntry } },
-							(err, result) => {
-								if (err) {
-									console.log("something went wrong");
-								} else {
-									let sum = 0;
-									let sum10 = 0;
-									let num = doc.stats.numRaces;
-									let num10 = 0;
-									let len = docs.history.length;
-									for (let j = len - 1; j >= 0; j--) {
-										if (j >= len - 10) {
-											sum10 += docs.history[j].wpm;
-											num10++;
-										}
-										sum += docs.history[j].wpm;
-									}
-									let lifetimeWpm = sum / num;
-									let pastTenWpm = sum10 / num10;
-									let newStats = {
-										wpm: lifetimeWpm,
-										wpm10: pastTenWpm,
-										numRaces: num
-									};
-									collection.updateOne({ username: racers[i] },
-										{ $set: { stats: newStats } },
-										genericCallback);
-								}
-							});
-					});
-			}
-		}
-		db.close();
-	})
-}
-*/
