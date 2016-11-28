@@ -219,6 +219,10 @@ socket.on("after_quit_race", function() {
 	$("#codebox").empty();
 });
 
+socket.on("connect_error", function() {
+	alert("top kek, the server died so u should kill the page and wait for the server to come back :/");
+});
+
 $("#btnRequestRace").click(function() {
 	var raceID = prompt("Enter the race ID you want to join:", 1997);
 	if (raceID) {
