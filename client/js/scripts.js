@@ -1,6 +1,3 @@
-
-var socket = io();
-
 const States = {
 	NONE: 0,
 	WAITING_FOR_RACE: 1,
@@ -13,6 +10,9 @@ const Correctness = {
 	PARTIAL: 1,
 	CORRECT: 2
 }
+
+// requires socket.io to be loaded first
+var socket = io();
 
 var currentState = States.NONE;
 
@@ -64,18 +64,11 @@ function checkUserInput(event) {
 			$(currentRaceLineDivs[myProgress.currentLine]).addClass("wrongCurrentLine");
 		}
 	}
-
 }
 
-function delayKeyEvent(event) {
+$("#usertextbox").keydown(function(event) {
 	setTimeout(checkUserInput, 0, event);
-}
-
-$("#usertextbox").keydown(delayKeyEvent);
-
-//$("#usertextbox").keyup(checkUserInput);
-
-//$("#usertextbox").keydown(checkUserInput);
+});
 
 function checkCorrectness(text) {
 	var trimmedLine = currentRaceLines[myProgress.currentLine].trim();
@@ -140,6 +133,7 @@ socket.on("found_race", function(raceID, raceText) {
 	$("#btnQuitRace").prop("disabled", false);
 	$("#codebox").empty();
 	$("#countdown").text("waiting for competitors to join...");
+	$("#stats").hide();
 });
 
 socket.on("start_race_timer", function(countdownTime, usersInRace) {
@@ -201,6 +195,11 @@ socket.on("race_state", function(raceID, userProgresses) {
 	updateProgresses(userProgresses);
 });
 
+socket.on("race_done", function(stats) {
+	$("#stats").show();
+	$("#statsTime").text(stats.time);
+});
+
 socket.on("race_all_done", function(raceID, userProgresses) {
 	console.log("race all done from server!");
 	if (raceID === currentRaceID) {
@@ -228,6 +227,10 @@ socket.on("after_quit_race", function() {
 
 socket.on("connect_error", function() {
 	alert("top kek, the server died so u should kill the page and wait for the server to come back :/");
+});
+
+socket.on("error_message", function(msg) {
+	alert("ERROR:\n" + msg);
 });
 
 $("#btnRequestRace").click(function() {
@@ -258,13 +261,3 @@ socket.on("test_receive", function(txt) {
 	console.log("got request from server");
 	$("#txtCode").text(txt);
 });
-
-
-
-
-
-// what does this do
-
-function test() {
-	$(document).ready
-}

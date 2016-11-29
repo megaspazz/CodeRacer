@@ -87,11 +87,6 @@ io.on("connection", function(socket) {
 	socket.on("race_request", function(raceID, userID) {
 		console.log("got race request");
 
-
-
-		//let raceText = "lorem ipsum\nherp derp";
-		// let raceText = fs.readFileSync(__dirname + "/race_texts/sum.js", "utf8");
-
 		if (!activeRaces[raceID]) {
 			// actually get a random race text
 			let fileNames = fs.readdirSync(RACE_TEXTS_PATH);
@@ -109,6 +104,11 @@ io.on("connection", function(socket) {
 				codeFile: fileNames[fileNum],
 				raceText: codeText
 			};
+		}
+		
+		if (activeRaces[raceID].users[userID]) {
+			socket.emit("error_message", "Already participant in requested race.");
+			return;
 		}
 
 		socket.emit("found_race", raceID, activeRaces[raceID].raceText);
@@ -190,6 +190,12 @@ io.on("connection", function(socket) {
 		// robon does individual user statistics
 		//
 		//
+		
+		let stats = {
+			time: duration
+		}
+		socket.emit("race_done", stats);
+		
 		checkRaceCompleted(raceID);
 	});
 	
