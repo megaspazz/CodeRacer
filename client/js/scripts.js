@@ -226,11 +226,17 @@ socket.on("after_quit_race", function() {
 });
 
 socket.on("connect_error", function() {
-	alert("top kek, the server died so u should kill the page and wait for the server to come back :/");
+	alert("top kek, the server died so auto refresh to kill ur client, pls check back l8r :/");
+	location.reload();
 });
 
-socket.on("error_message", function(msg) {
+socket.on("error_message", function (msg) {
 	alert("ERROR:\n" + msg);
+});
+
+socket.on("force_refresh", function(msg) {
+	alert("CRITICAL ERROR:\n" + msg + "\n\nThe webpage will now refresh.");
+	location.reload();
 });
 
 $("#btnRequestRace").click(function() {

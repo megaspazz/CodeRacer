@@ -10,9 +10,10 @@ var fs = require("fs");
 
 const UserStates = {
 	NONE: 0,
-	STARTED: 1,
-	FINISHED: 2,
-	QUIT: 3
+	STARTING: 1,
+	STARTED: 2,
+	FINISHED: 3,
+	QUIT: 4
 }
 
 const PRE_RACE_TIME = 10000;
@@ -52,7 +53,8 @@ function getStartRaceFunction(raceID, userID) {
 	return function() {
 		if (activeRaces[raceID]) {
 			let user = activeRaces[raceID].users[userID];
-			if (user.state === UserStates.NONE) {
+			if (user.state === UserStates.STARTING) {
+				user.state = UserStates.STARTED;
 				user.connection.emit("start_race");
 			}
 		}
@@ -63,7 +65,8 @@ function checkRaceCompleted(raceID) {
 	let done = true;
 	for (let id in activeRaces[raceID].users) {
 		let userState = activeRaces[raceID].users[id].state;
-		if (userState === UserStates.NONE || userState === UserStates.STARTED) {
+		// is might be better to say that it's not FINISHED or QUIT
+		if (userState === UserStates.NONE || userState === UserStates.STARTING || userState === UserStates.STARTED) {
 			done = false;
 			break;
 		}
@@ -136,7 +139,7 @@ io.on("connection", function(socket) {
 			for (let userID in activeRaces[raceID].users) {
 				let user = activeRaces[raceID].users[userID];
 				if (user.state === UserStates.NONE) {
-					user.started = UserStates.STARTED;
+					user.state = UserStates.STARTING;
 					let now = Date.now();
 					let remainingTime = Math.max(0, activeRaces[raceID].startTime - now);
 					let startRaceFn = getStartRaceFunction(raceID, userID);
@@ -150,8 +153,9 @@ io.on("connection", function(socket) {
 	
 	socket.on("progress_report", function(raceID, userID, progress) {
 		console.log("got progress report from " + userID);
-		if (!activeRaces[raceID]) {
+		if (!activeRaces[raceID] || !activeRaces[raceID].users[userID]) {
 			console.log("warning: report for dead race.");
+			socket.emit("force_refresh", "Tried to play a nonexistent race... try refreshing the webpage.");
 			return;
 		}
 
@@ -168,6 +172,11 @@ io.on("connection", function(socket) {
 		console.log("user " + userID + " quitting race " + raceID);
 		if (activeRaces[raceID]) {
 			let user = activeRaces[raceID].users[userID];
+			// sometimes the server had to restart, so people might quit nonexistent races
+			if (!user) {
+				socket.emit("force_refresh", "Tried to quit a nonexistent race... try refreshing the webpage.");
+				return;
+			}
 			if (!user.finishTime) {
 				// if the user didn't finish the race we should record it in the stats
 				user.state = UserStates.QUIT;
@@ -181,6 +190,11 @@ io.on("connection", function(socket) {
 	
 	socket.on("race_finished", function(raceID, userID) {
 		console.log("race finished");
+		// sometimes the server had to restart, so people might be on zombie races
+		if (!activeRaces[raceID] || !activeRaces[raceID].users[userID]) {
+			socket.emit("force_refresh", "Tried to finish a nonexistent race... try refreshing the webpage.");
+			return;
+		}
 		let now = Date.now();
 		let duration = now - activeRaces[raceID].startTime;
 		activeRaces[raceID].users[userID].finishTime = duration;
