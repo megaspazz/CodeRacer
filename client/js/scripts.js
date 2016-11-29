@@ -21,7 +21,6 @@ var currentRaceLines = null;
 var currentRaceLineDivs = null;
 var currentRaceStartTimeMS = null;
 var currentUsersInRace = null;
-var currentCountdownTimerID = null;
 
 var countdownIntervalID = null;
 
@@ -212,7 +211,13 @@ socket.on("race_all_done", function(raceID, userProgresses) {
 });
 
 socket.on("after_quit_race", function() {
+	console.log("after quit race (event from server)");
+	
+	clearInterval(countdownIntervalID);
+	countdownIntervalID = null;
+	
 	currentState = States.NONE;
+	$("#countdown").text("");
 	$("#usertextbox").val("");
 	$("#usertextbox").prop("disabled", true);
 	$("#usertextbox").removeClass("wrongLine");

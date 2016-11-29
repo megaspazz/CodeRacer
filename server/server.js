@@ -48,9 +48,14 @@ function getUserProgresses(raceID) {
 	return userProgresses;
 }
 
-function getStartRaceFunction(sock) {
+function getStartRaceFunction(raceID, userID) {
 	return function() {
-		sock.emit("start_race");
+		if (activeRaces[raceID]) {
+			let user = activeRaces[raceID].users[userID];
+			if (user.state === UserStates.NONE) {
+				user.connection.emit("start_race");
+			}
+		}
 	}
 }
 
@@ -134,7 +139,7 @@ io.on("connection", function(socket) {
 					user.started = UserStates.STARTED;
 					let now = Date.now();
 					let remainingTime = Math.max(0, activeRaces[raceID].startTime - now);
-					let startRaceFn = getStartRaceFunction(user.connection);
+					let startRaceFn = getStartRaceFunction(raceID, userID);
 					setTimeout(startRaceFn, remainingTime);
 					console.log("remaining time = " + remainingTime);
 					user.connection.emit("start_race_timer", remainingTime, usersInRace);
@@ -160,6 +165,7 @@ io.on("connection", function(socket) {
 	});
 	
 	socket.on("quit_race", function(raceID, userID) {
+		console.log("user " + userID + " quitting race " + raceID);
 		if (activeRaces[raceID]) {
 			let user = activeRaces[raceID].users[userID];
 			if (!user.finishTime) {
