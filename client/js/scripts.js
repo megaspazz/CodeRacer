@@ -213,7 +213,9 @@ socket.on("race_all_done", function(raceID, userProgresses) {
 
 socket.on("after_quit_race", function() {
 	currentState = States.NONE;
+	$("#usertextbox").val("");
 	$("#usertextbox").prop("disabled", true);
+	$("#usertextbox").removeClass("wrongLine");
 	$("#btnRequestRace").prop("disabled", false);
 	$("#btnQuitRace").prop("disabled", true);
 	$("#codebox").empty();
