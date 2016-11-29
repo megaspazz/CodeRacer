@@ -122,6 +122,9 @@ function updateUserPassword(uname, pass) {
 	});
 }
 
+// NOT TOTALLY GR8
+// figure out global history list
+// figure out how to close the database
 function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
