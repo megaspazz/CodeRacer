@@ -280,7 +280,7 @@ socket.on("race_all_done", function(raceID, userProgresses) {
 	}
 });
 
-socket.on("after_quit_race", function() {
+socket.on("after_quit_race", function(raceID) {
 	console.log("after quit race (event from server)");
 	
 	clearInterval(countdownIntervalID);

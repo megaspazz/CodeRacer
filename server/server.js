@@ -189,15 +189,19 @@ io.on("connection", function(socket) {
 		console.log("user " + userID + " quitting race " + raceID);
 		if (activeRaces[raceID]) {
 			let user = activeRaces[raceID].users[userID];
+			
 			// sometimes the server had to restart, so people might quit nonexistent races
+			// in this case we will just let them know that they quit
 			if (!user) {
-				socket.emit("force_refresh", "Tried to quit a nonexistent race... try refreshing the webpage.");
-				return;
+				console.log("warning: unregistered user " + userID  + " tried to quit race " + raceID);
 			}
-			if (!user.finishTime) {
-				// if the user didn't finish the race we should record it in the stats
+			
+			// let the user know that they quit the race, even if it was non-existent
+			socket.emit("after_quit_race", raceID);
+			
+			// if the user didn't finish the race we should record it in the stats
+			if (user && !user.finishTime) {
 				user.state = UserStates.QUIT;
-				user.connection.emit("after_quit_race");
 				checkRaceCompleted(raceID);
 			}
 		} else {
