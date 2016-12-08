@@ -61,7 +61,7 @@ function getStartRaceFunction(raceID, userID) {
 	return function() {
 		if (activeRaces[raceID]) {
 			let user = activeRaces[raceID].users[userID];
-			if (user.state === UserStates.STARTING) {
+			if (user && user.state === UserStates.STARTING) {
 				user.state = UserStates.STARTED;
 				user.connection.emit("start_race", raceID, activeRaces[raceID].raceText);
 			}
@@ -89,7 +89,23 @@ function checkRaceCompleted(raceID) {
 		}
 		delete activeRaces[raceID];
 	}
+	return done;
 }
+
+function checkRaceStarted(raceID) {
+	let currTime = Date.now();
+	return activeRaces[raceID] && activeRaces[raceID].startTime && currTime > activeRaces[raceID].startTime;
+}
+
+function getUsersInRace(raceID) {
+	let usersInRace = [];
+	for (let userID in activeRaces[raceID].users) {
+		let user = activeRaces[raceID].users[userID];
+		usersInRace.push(user.name);
+	}
+	return usersInRace;
+}
+
 
 
 io.on("connection", function(socket) {
@@ -119,12 +135,15 @@ io.on("connection", function(socket) {
 		}
 		
 		if (activeRaces[raceID].users[userID]) {
-			socket.emit("error_message", "Already participant in requested race.");
+			if (activeRaces[raceID].users[userID] === UserStates.QUIT) {
+				socket.emit("error_message", "Cannot rejoin a race that you quit.");
+			} else {
+				socket.emit("error_message", "Already participant in requested race.");
+			}
 			return;
 		}
 		
-		let currTime = Date.now();
-		if (activeRaces[raceID].startTime && currTime > activeRaces[raceID].startTime) {
+		if (checkRaceStarted(raceID)) {
 			socket.emit("error_message", "Cannot join a race that has already started.");
 			return;
 		}
@@ -145,11 +164,7 @@ io.on("connection", function(socket) {
 				activeRaces[raceID].startTime = time;
 			}
 			
-			let usersInRace = [];
-			for (let userID in activeRaces[raceID].users) {
-				let user = activeRaces[raceID].users[userID];
-				usersInRace.push(user.name);
-			}
+			let usersInRace = getUsersInRace(raceID);
 			
 			for (let userID in activeRaces[raceID].users) {
 				let user = activeRaces[raceID].users[userID];
@@ -187,22 +202,40 @@ io.on("connection", function(socket) {
 	
 	socket.on("quit_race", function(raceID, userID) {
 		console.log("user " + userID + " quitting race " + raceID);
+		
+		// let the user know that they quit the race, even if it was non-existent or if they didn't belong to the race
+		socket.emit("after_quit_race", raceID);
+		
 		if (activeRaces[raceID]) {
-			let user = activeRaces[raceID].users[userID];
-			
-			// sometimes the server had to restart, so people might quit nonexistent races
-			// in this case we will just let them know that they quit
-			if (!user) {
-				console.log("warning: unregistered user " + userID  + " tried to quit race " + raceID);
-			}
-			
-			// let the user know that they quit the race, even if it was non-existent
-			socket.emit("after_quit_race", raceID);
-			
-			// if the user didn't finish the race we should record it in the stats
-			if (user && !user.finishTime) {
-				user.state = UserStates.QUIT;
-				checkRaceCompleted(raceID);
+			if (checkRaceStarted(raceID)) {
+				// if the race has already started, then we will mark the user as quitting the race
+				let user = activeRaces[raceID].users[userID];
+				
+				// sometimes the server had to restart, so people might quit nonexistent races
+				// in this case we will just let them know that they quit
+				if (!user) {
+					console.log("warning: unregistered user " + userID  + " tried to quit race " + raceID);
+				}
+				
+				// if the user didn't finish the race we should record it in the stats
+				if (user && !user.finishTime) {
+					user.state = UserStates.QUIT;
+					checkRaceCompleted(raceID);
+				}
+			} else {
+				// if the race didn't start yet, we will just delete them from the list of racers
+				if (activeRaces[raceID].users[userID]) {
+					delete activeRaces[raceID].users[userID];
+					let done = checkRaceCompleted(raceID);
+					if (!done) {
+						// if the race isn't over, update the list of racers for those still in the race
+						let usersInRace = getUsersInRace(raceID);
+						for (let userID in activeRaces[raceID].users) {
+							let user = activeRaces[raceID].users[userID];
+							user.connection.emit("update_users_in_race", raceID, usersInRace);
+						}
+					}
+				}
 			}
 		} else {
 			console.log("warning: tried to quit a nonexistent race!");
