@@ -227,6 +227,7 @@ socket.on("start_race", function(raceID, raceText) {
 	}
 	
 	// initialize opponent markers
+	opponentLastLine = { };
 	for (var userID in currentUsersInRace) {
 		updateOpponentProgress(userID, 0);
 	}
