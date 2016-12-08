@@ -135,7 +135,7 @@ io.on("connection", function(socket) {
 		}
 		
 		if (activeRaces[raceID].users[userID]) {
-			if (activeRaces[raceID].users[userID] === UserStates.QUIT) {
+			if (activeRaces[raceID].users[userID].state === UserStates.QUIT) {
 				socket.emit("error_message", "Cannot rejoin a race that you quit.");
 			} else {
 				socket.emit("error_message", "Already participant in requested race.");
