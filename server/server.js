@@ -25,6 +25,7 @@ const CLIENT_PATH = path.resolve(__dirname + "/../client");
 const RACE_TEXTS_PATH = __dirname + "/race_texts";
 
 var activeRaces = { };
+var activeUsers = { };    // NYI
 
 app.use("/css",  express.static(CLIENT_PATH + "/css"));
 app.use("/js",  express.static(CLIENT_PATH + "/js"));
@@ -49,13 +50,20 @@ function getUserProgresses(raceID) {
 	return userProgresses;
 }
 
+function getRaceStateFunction(raceID, userID) {
+	return function() {
+		let user = activeRaces[raceID].users[userID];
+		
+	}
+}
+
 function getStartRaceFunction(raceID, userID) {
 	return function() {
 		if (activeRaces[raceID]) {
 			let user = activeRaces[raceID].users[userID];
 			if (user.state === UserStates.STARTING) {
 				user.state = UserStates.STARTED;
-				user.connection.emit("start_race");
+				user.connection.emit("start_race", raceID, activeRaces[raceID].raceText);
 			}
 		}
 	}
@@ -104,6 +112,7 @@ io.on("connection", function(socket) {
 			activeRaces[raceID] = {
 				users: { },
 				startTime: null,
+				finishedRacers: 0,
 				codeFile: fileNames[fileNum],
 				raceText: codeText
 			};
@@ -113,8 +122,14 @@ io.on("connection", function(socket) {
 			socket.emit("error_message", "Already participant in requested race.");
 			return;
 		}
+		
+		let currTime = Date.now();
+		if (activeRaces[raceID].startTime && currTime > activeRaces[raceID].startTime) {
+			socket.emit("error_message", "Cannot join a race that has already started.");
+			return;
+		}
 
-		socket.emit("found_race", raceID, activeRaces[raceID].raceText);
+		socket.emit("found_race", raceID);
 		activeRaces[raceID].users[userID] = {
 			name: userID,    // make this the actual display name
 			connection: socket,
@@ -145,7 +160,9 @@ io.on("connection", function(socket) {
 					let startRaceFn = getStartRaceFunction(raceID, userID);
 					setTimeout(startRaceFn, remainingTime);
 					console.log("remaining time = " + remainingTime);
-					user.connection.emit("start_race_timer", remainingTime, usersInRace);
+					user.connection.emit("start_race_timer", raceID, remainingTime, usersInRace);
+				} else if (user.state === UserStates.STARTING) {
+					user.connection.emit("update_users_in_race", raceID, usersInRace);
 				}
 			}
 		}
@@ -195,6 +212,11 @@ io.on("connection", function(socket) {
 			socket.emit("force_refresh", "Tried to finish a nonexistent race... try refreshing the webpage.");
 			return;
 		}
+		
+		// update the number of finished racers, which is also the user's placement in the race
+		activeRaces[raceID].finishedRacers++;
+		var placement = activeRaces[raceID].finishedRacers;
+		
 		let now = Date.now();
 		let duration = now - activeRaces[raceID].startTime;
 		activeRaces[raceID].users[userID].finishTime = duration;
@@ -205,8 +227,10 @@ io.on("connection", function(socket) {
 		//
 		//
 		
+		
 		let stats = {
-			time: duration
+			time: duration,
+			rank: placement
 		}
 		socket.emit("race_done", stats);
 		

@@ -19,6 +19,9 @@ var currentState = States.NONE;
 var currentRaceID = null;
 var currentRaceLines = null;
 var currentRaceLineDivs = null;
+var containerDivs = null;
+var opponentDivs = null;
+var opponentLastLine = { };
 var currentRaceStartTimeMS = null;
 var currentUsersInRace = null;
 
@@ -70,19 +73,19 @@ $("#usertextbox").keydown(function(event) {
 	setTimeout(checkUserInput, 0, event);
 });
 
-function checkCorrectness(text) {
+function checkCorrectness(txt) {
 	var trimmedLine = currentRaceLines[myProgress.currentLine].trim();
-	if (text.length > trimmedLine.length || text !== trimmedLine.substring(0, text.length)) {
+	if (txt.length > trimmedLine.length || txt !== trimmedLine.substring(0, txt.length)) {
 		return Correctness.WRONG;
-	} else if (text.length !== trimmedLine.length) {
+	} else if (txt.length !== trimmedLine.length) {
 		return Correctness.PARTIAL;
 	} else {
 		return Correctness.CORRECT;
 	}
 }
 
-function getLines(text) {
-	return text.split(/\r?\n/g);
+function getLines(txt) {
+	return txt.split(/\r?\n/g);
 }
 
 // end of roger's kool stuff
@@ -120,15 +123,10 @@ function updateCountdown() {
 	$("#countdown").text(remainingMS);
 }
 
-socket.on("found_race", function(raceID, raceText) {
+socket.on("found_race", function(raceID) {
 	console.log("got request to start race from server");
 	currentRaceID = raceID;
 	currentState = States.WAITING_FOR_RACE;
-	currentRaceLines = getLines(raceText);
-	currentRaceLineDivs = currentRaceLines.map(function(line) {
-		var divContent = line.replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;") || "&nbsp;";
-		return $("<div>&nbsp;&nbsp;" + divContent + "</div>");
-	});
 	$("#btnRequestRace").prop("disabled", true);
 	$("#btnQuitRace").prop("disabled", false);
 	$("#codebox").empty();
@@ -136,8 +134,18 @@ socket.on("found_race", function(raceID, raceText) {
 	$("#stats").hide();
 });
 
-socket.on("start_race_timer", function(countdownTime, usersInRace) {
-	console.log("starting race timer");
+function updateCurrentUsersInRace(usersInRace) {
+	// reset the current users in the race
+	currentUsersInRace = { };
+	
+	// create a new object for users in the race
+	for (var i = 0; i < usersInRace.length; i++) {
+		currentUsersInRace[usersInRace[i]] = { };
+	}
+}
+
+socket.on("start_race_timer", function(raceID, countdownTime, usersInRace) {
+	console.log("starting race timer for: " + raceID);
 	
 	if (!countdownIntervalID) {
 		console.log("actually starting race timer");
@@ -148,27 +156,86 @@ socket.on("start_race_timer", function(countdownTime, usersInRace) {
 		countdownIntervalID = setInterval(updateCountdown, 40);
 		reportProgress();    // only report progress when the race actually starts
 		
-		// reset the current users in the race
-		currentUsersInRace = { };
-		
-		// create a new object for users in the race
-		for (var i = 0; i < usersInRace.length; i++) {
-			currentUsersInRace[usersInRace[i]] = { };
-		}
+		updateCurrentUsersInRace(usersInRace);
 	}
 });
 
-socket.on("start_race", function() {
+socket.on("update_users_in_race", function(raceID, usersInRace) {
+	console.log("updating users in the race");
+	
+	updateCurrentUsersInRace(usersInRace);
+});
+
+function updateOpponentProgress(opponentID, currLine) {
+	var lastLine = opponentLastLine[opponentID];
+	if (lastLine !== currLine) {
+		// clear the race marker from the opponent's last line
+		// the default of undefined will actually evaluate to false
+		if (lastLine >= 0) {
+			opponentDivs[lastLine][opponentID].text("");
+		}
+		
+		// update the opponent's race marker
+		var lineCnt = currentRaceLines.length;
+		if (currLine < lineCnt) {
+			// opponent did not finish yet
+			opponentDivs[currLine][opponentID].text("V");
+		} else {
+			// opponent finished the race
+			for (var i = 0; i < lineCnt; i++) {
+				opponentDivs[i][opponentID].text("$");	
+			}
+		}
+		opponentLastLine[opponentID] = currLine;
+	}
+}
+
+socket.on("start_race", function(raceID, raceText) {
 	clearInterval(countdownIntervalID);
 	countdownIntervalID = null;
 	
 	$("#countdown").text("");
 	currentState = States.IN_RACE;
-	//$("#txtCode").text(currentRaceText);
+	
+	currentRaceLines = getLines(raceText);
+	currentRaceLineDivs = currentRaceLines.map(function(line) {
+		var lineText = line.replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;") || "&nbsp;";
+		var divLine = $("<div>&nbsp;&nbsp;" + lineText + "</div>");
+		divLine.addClass("codeLine");
+		return divLine;
+	});
+	
 	var codebox = $("#codebox");
-	for (var i = 0; i < currentRaceLineDivs.length; i++) {
-		codebox.append(currentRaceLineDivs[i]);
+	containerDivs = [];
+	opponentDivs = [];
+	for (var i = 0; i < currentRaceLines.length; i++) {
+		var divContainer = $("<div></div>");
+		divContainer.addClass("lineContainer");
+		containerDivs.push(divContainer);
+		
+		opponentDivs.push({ });
+		for (var userID in currentUsersInRace) {
+			var divOpponent = $("<div></div>");
+			divOpponent.addClass("opponent");
+			opponentDivs[i][userID] = divOpponent;
+			divContainer.append(divOpponent);
+		}
+		
+		divContainer.append(currentRaceLineDivs[i]);
+		
+		codebox.append(divContainer);
 	}
+	
+	// initialize opponent markers
+	for (var userID in currentUsersInRace) {
+		updateOpponentProgress(userID, 0);
+	}
+	
+	//$("#txtCode").text(currentRaceText);
+	//var codebox = $("#codebox");
+	//for (var i = 0; i < currentRaceLineDivs.length; i++) {
+	//	codebox.append(currentRaceLineDivs[i]);
+	//}
 	myProgress = {
 		currentLine: 0,
 		totalLines: currentRaceLines.length
@@ -186,6 +253,8 @@ function updateProgresses(userProgresses) {
 		if (progress) {
 			// @huboy update UI with other racers' progress
 			console.log(id + ": " + progress.currentLine + " / " + progress.totalLines);
+			
+			updateOpponentProgress(id, progress.currentLine);
 		}
 	}
 }
@@ -198,6 +267,7 @@ socket.on("race_state", function(raceID, userProgresses) {
 socket.on("race_done", function(stats) {
 	$("#stats").show();
 	$("#statsTime").text(stats.time);
+	$("#statsRank").text(stats.rank);
 });
 
 socket.on("race_all_done", function(raceID, userProgresses) {
