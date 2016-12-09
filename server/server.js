@@ -242,7 +242,7 @@ io.on("connection", function(socket) {
 		}
 	});
 	
-	socket.on("race_finished", function(raceID, userID) {
+	socket.on("race_finished", function(raceID, userID, progress) {
 		console.log("race finished");
 		// sometimes the server had to restart, so people might be on zombie races
 		if (!activeRaces[raceID] || !activeRaces[raceID].users[userID]) {
@@ -250,16 +250,26 @@ io.on("connection", function(socket) {
 			return;
 		}
 		
-		// update the number of finished racers, which is also the user's placement in the race
-		activeRaces[raceID].finishedRacers++;
-		var placement = activeRaces[raceID].finishedRacers;
-		
+		// calculate how long it took to finish the race
 		let now = Date.now();
 		let duration = now - activeRaces[raceID].startTime;
+		
+		// update this user in the set of active races
 		activeRaces[raceID].users[userID].finishTime = duration;
-		activeRaces[raceID].users[userID].progress.currentLine = activeRaces[raceID].users[userID].progress.totalLines;
+		activeRaces[raceID].users[userID].progress = progress;
 		activeRaces[raceID].users[userID].state = UserStates.FINISHED;
 		console.log("!!! " + userID + " FINISHED !!!");
+		
+		// update the number of finished racers, which is also the user's placement in the race
+		activeRaces[raceID].finishedRacers++;
+		let placement = activeRaces[raceID].finishedRacers;
+		
+		// calculate the CPM
+		let cpm = progress.numCorrectKeys / duration * 60000;
+		
+		// calculate the accuracy
+		let accuracyRating = progress.numCorrectKeys / (progress.numCorrectKeys + progress.numWrongKeys);
+		
 		// robon does individual user statistics
 		//
 		//
@@ -267,7 +277,9 @@ io.on("connection", function(socket) {
 		
 		let stats = {
 			time: duration,
-			rank: placement
+			rank: placement,
+			accuracy: accuracyRating,
+			charsPerMin: cpm
 		}
 		socket.emit("race_done", stats);
 		

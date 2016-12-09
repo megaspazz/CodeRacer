@@ -30,10 +30,17 @@ var countdownIntervalID = null;
 var currentUserID = ~~(Math.random() * 1000000000);    // initialize as the current user's ID
 console.log("user id = " + currentUserID);
 
+// this object will be sent to the server when reporting progress
+// properties shown below are only for display, they will be reset at the start of every race
 var myProgress = {
 	currentLine: null,
-	totalLines: null
+	totalLines: null,
+	maxLinePos: null,
+	numCorrectKeys: null,
+	numWrongKeys: null
 };
+
+var lastLineLength = null;
 
 // roger's kool stuff
 // check user input, get progress, etc.
@@ -41,13 +48,18 @@ var myProgress = {
 function checkUserInput(event) {
 	var keyCode = event.keyCode || event.which;
 	var userText = $("#usertextbox").val();
-	var correctness = checkCorrectness(userText);
+	var correctnessObj = getCorrectness(userText);
+	var correctness = correctnessObj.correctness;
+	var correctLength = correctnessObj.length;
 	if (keyCode === 13) {
 		if (correctness === Correctness.CORRECT) {
 			var usertextbox = $("#usertextbox");
 			usertextbox.val("");
 			deactivateLine(myProgress.currentLine);
 			myProgress.currentLine++;
+			myProgress.maxLinePos = 0;
+			myProgress.numCorrectKeys++;
+			lastLineLength = 0;
 			if (myProgress.currentLine < myProgress.totalLines) {
 				activateLine(myProgress.currentLine);
 			} else {
@@ -55,8 +67,10 @@ function checkUserInput(event) {
 				$("#btnRequestRace").prop("disabled", false);
 				$("#btnQuitRace").prop("disabled", true);
 				currentState = States.FINISHED;
-				socket.emit("race_finished", currentRaceID, currentUserID);
+				socket.emit("race_finished", currentRaceID, currentUserID, myProgress);
 			}
+		} else {
+			myProgress.numWrongKeys++;
 		}
 	} else {
 		if (correctness !== Correctness.WRONG) {
@@ -65,13 +79,48 @@ function checkUserInput(event) {
 		} else {
 			$("#usertextbox").addClass("wrongLine");
 			$(currentRaceLineDivs[myProgress.currentLine]).addClass("wrongCurrentLine");
+			if (userText.length > lastLineLength) {
+				myProgress.numWrongKeys++;
+			}
 		}
+		
+		// number of correct keys is always up to the farthest position they have reached in the code
+		var diff = userText.length - myProgress.maxLinePos;
+		if (diff > 0) {
+			myProgress.numCorrectKeys += diff;
+			myProgress.maxLinePos = userText.length;
+		}
+		
+		// update this to be the most recent line length value
+		lastLineLength = userText.length;
 	}
 }
 
 $("#usertextbox").keydown(function(event) {
 	setTimeout(checkUserInput, 0, event);
 });
+
+
+
+// rewrite this function to combine getCorrectnessLength and checkCorrectness
+// and then you can delete those two functions
+function getCorrectness(txt) {
+	return {
+		correctness: checkCorrectness(txt),
+		correctLength: getCorrectnessLength(txt)
+	}
+}
+
+function getCorrectnessLength(txt) {
+	var trimmedLine = currentRaceLines[myProgress.currentLine].trim();
+	var len = Math.min(txt.length, trimmedLine.length);
+	for (var i = 0; i < len; i++) {
+		if (txt[i] != trimmedLine[i]) {
+			return i;
+		}
+	}
+	return len;
+}
 
 function checkCorrectness(txt) {
 	var trimmedLine = currentRaceLines[myProgress.currentLine].trim();
@@ -239,7 +288,10 @@ socket.on("start_race", function(raceID, raceText) {
 	//}
 	myProgress = {
 		currentLine: 0,
-		totalLines: currentRaceLines.length
+		totalLines: currentRaceLines.length,		
+		maxLinePos: 0,
+		numCorrectKeys: 0,
+		numWrongKeys: 0
 	};
 	activateLine(0);
 	var usertextbox = $("#usertextbox");
@@ -269,6 +321,9 @@ socket.on("race_done", function(stats) {
 	$("#stats").show();
 	$("#statsTime").text(stats.time);
 	$("#statsRank").text(stats.rank);
+	$("#statsAccuracy").text((100 * stats.accuracy).toFixed(2) + "%");
+	$("#statsCharsPerMin").text(stats.charsPerMin.toFixed(2));
+	$("#statsCharsPerMin").attr("title", (stats.charsPerMin / 5).toFixed(2) + " WPM");
 });
 
 socket.on("race_all_done", function(raceID, userProgresses) {
