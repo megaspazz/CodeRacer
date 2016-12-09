@@ -169,7 +169,7 @@ function deactivateLine(inactiveLine) {
 function updateCountdown() {
 	var currTime = new Date();
 	var remainingMS = currentRaceStartTimeMS - currTime.getTime();
-	$("#countdown").text(remainingMS);
+	$("#countdown").text("Countdown (seconds): " + (remainingMS / 1000).toFixed(3));
 }
 
 socket.on("found_race", function(raceID) {
@@ -379,17 +379,3 @@ function quitRace() {
 $("#btnQuitRace").click(quitRace);
 
 $(window).on("beforeunload", quitRace);
-
-
-
-
-
-
-$("#btnTestServer").click(function() {
-	socket.emit("test request");
-});
-
-socket.on("test_receive", function(txt) {
-	console.log("got request from server");
-	$("#txtCode").text(txt);
-});

@@ -135,10 +135,17 @@ io.on("connection", function(socket) {
 		}
 		
 		if (activeRaces[raceID].users[userID]) {
-			if (activeRaces[raceID].users[userID].state === UserStates.QUIT) {
-				socket.emit("error_message", "Cannot rejoin a race that you quit.");
-			} else {
-				socket.emit("error_message", "Already participant in requested race.");
+			var userState = activeRaces[raceID].users[userID].state;
+			switch (userState) {
+				case UserStates.QUIT:
+					socket.emit("error_message", "Cannot rejoin after quitting in the middle of a race.");
+					break;
+				case UserStates.FINISHED:
+					socket.emit("error_message", "Already finished the requested race.");
+					break;
+				default:
+					socket.emit("error_message", "Already participant in requested race.");
+					break;
 			}
 			return;
 		}
@@ -258,7 +265,7 @@ io.on("connection", function(socket) {
 		activeRaces[raceID].users[userID].finishTime = duration;
 		activeRaces[raceID].users[userID].progress = progress;
 		activeRaces[raceID].users[userID].state = UserStates.FINISHED;
-		console.log("!!! " + userID + " FINISHED !!!");
+		console.log("!!! " + userID +  " FINISHED !!!");
 		
 		// update the number of finished racers, which is also the user's placement in the race
 		activeRaces[raceID].finishedRacers++;
