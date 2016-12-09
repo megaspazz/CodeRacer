@@ -319,7 +319,7 @@ socket.on("race_state", function(raceID, userProgresses) {
 
 socket.on("race_done", function(stats) {
 	$("#stats").show();
-	$("#statsTime").text(stats.time);
+	$("#statsTime").text(((stats.time) / 1000).toFixed(3));
 	$("#statsRank").text(stats.rank);
 	$("#statsAccuracy").text((100 * stats.accuracy).toFixed(2) + "%");
 	$("#statsCharsPerMin").text(stats.charsPerMin.toFixed(2));
