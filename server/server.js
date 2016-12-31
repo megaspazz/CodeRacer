@@ -36,11 +36,34 @@ app.get('/', function(req, res) {
 });
 
 http.listen(PORT, function() {
-	console.log("starting server on *:" + PORT);
+	serverLog("starting server on *:" + PORT);
 });
 
 
 
+function padLeft(orig, padChar, targetLen) {
+	let str = String(orig);
+	let padLen = targetLen - str.length;
+	if (padLen <= 0) {
+		return str;
+	}
+	return padChar.repeat(padLen) + str;
+}
+
+function getDateTimeDisplay(dateTime) {
+	let yr = padLeft(dateTime.getFullYear(), "0", 4);
+	let mo = padLeft(dateTime.getMonth() + 1, "0", 2);
+	let dt = padLeft(dateTime.getDay(), "0", 2);
+	let hr = padLeft(dateTime.getHours(), "0", 2);
+	let mn = padLeft(dateTime.getMinutes(), "0", 2);
+	let sc = padLeft(dateTime.getSeconds(), "0", 2);
+	let ms = padLeft(dateTime.getMilliseconds(), "0", 3);
+	return mo + "/" + dt + "/" + yr + " " + hr + ":" + mn + ":" + sc + "." + ms;
+}
+
+function serverLog(msg) {
+	console.log("[" + getDateTimeDisplay(new Date()) + "] " + msg);
+}
 
 function getUserProgresses(raceID) {
 	let userProgresses = { };
@@ -81,7 +104,7 @@ function checkRaceCompleted(raceID) {
 	}
 	if (done) {
 		// robon saves match into history table
-		console.log("*** " + raceID + " ALL DONE ***");
+		serverLog("*** " + raceID + " ALL DONE ***");
 		for (let id in activeRaces[raceID].users) {
 			let user = activeRaces[raceID].users[id];
 			let userProgresses = getUserProgresses(raceID);
@@ -109,10 +132,10 @@ function getUsersInRace(raceID) {
 
 
 io.on("connection", function(socket) {
-	console.log("+ CONNECTION");
+	serverLog("+ CONNECTION @ " + socket.request.connection.remoteAddress);
 
 	socket.on("race_request", function(raceID, userID) {
-		console.log("got race request");
+		serverLog("got race request");
 
 		if (!activeRaces[raceID]) {
 			// actually get a random race text
@@ -121,9 +144,9 @@ io.on("connection", function(socket) {
 			let fullFilePath = path.join(RACE_TEXTS_PATH, fileNames[fileNum]);
 			let codeText = fs.readFileSync(fullFilePath, "utf8");
 
-			console.log(fileNames);
-			console.log(fileNames[fileNum]);
-			console.log(codeText);
+			serverLog(fileNames);
+			serverLog(fileNames[fileNum]);
+			serverLog(codeText);
 
 			activeRaces[raceID] = {
 				users: { },
@@ -163,7 +186,7 @@ io.on("connection", function(socket) {
 			state: UserStates.NONE,
 			finishTime: NaN
 		}
-		console.log(Object.keys(activeRaces[raceID].users).length);
+		serverLog(Object.keys(activeRaces[raceID].users).length);
 		if (Object.keys(activeRaces[raceID].users).length >= 2) {
 			if (!activeRaces[raceID].startTime) {
 				let now = Date.now();
@@ -181,7 +204,7 @@ io.on("connection", function(socket) {
 					let remainingTime = Math.max(0, activeRaces[raceID].startTime - now);
 					let startRaceFn = getStartRaceFunction(raceID, userID);
 					setTimeout(startRaceFn, remainingTime);
-					console.log("remaining time = " + remainingTime);
+					serverLog("remaining time = " + remainingTime);
 					user.connection.emit("start_race_timer", raceID, remainingTime, usersInRace);
 				} else if (user.state === UserStates.STARTING) {
 					user.connection.emit("update_users_in_race", raceID, usersInRace);
@@ -191,9 +214,9 @@ io.on("connection", function(socket) {
 	});
 	
 	socket.on("progress_report", function(raceID, userID, progress) {
-		console.log("got progress report from " + userID);
+		serverLog("got progress report from " + userID);
 		if (!activeRaces[raceID] || !activeRaces[raceID].users[userID]) {
-			console.log("warning: report for dead race.");
+			serverLog("warning: report for dead race.");
 			socket.emit("force_refresh", "Tried to play a nonexistent race... try refreshing the webpage.");
 			return;
 		}
@@ -204,11 +227,11 @@ io.on("connection", function(socket) {
 	});
 
 	socket.on("disconnect", function() {
-		console.log("- DISCONNECTION");
+		serverLog("- DISCONNECTION @ " + socket.request.connection.remoteAddress);
 	});
 	
 	socket.on("quit_race", function(raceID, userID) {
-		console.log("user " + userID + " quitting race " + raceID);
+		serverLog("user " + userID + " quitting race " + raceID);
 		
 		// let the user know that they quit the race, even if it was non-existent or if they didn't belong to the race
 		socket.emit("after_quit_race", raceID);
@@ -221,7 +244,7 @@ io.on("connection", function(socket) {
 				// sometimes the server had to restart, so people might quit nonexistent races
 				// in this case we will just let them know that they quit
 				if (!user) {
-					console.log("warning: unregistered user " + userID  + " tried to quit race " + raceID);
+					serverLog("warning: unregistered user " + userID  + " tried to quit race " + raceID);
 				}
 				
 				// if the user didn't finish the race we should record it in the stats
@@ -245,12 +268,12 @@ io.on("connection", function(socket) {
 				}
 			}
 		} else {
-			console.log("warning: tried to quit a nonexistent race!");
+			serverLog("warning: tried to quit a nonexistent race!");
 		}
 	});
 	
 	socket.on("race_finished", function(raceID, userID, progress) {
-		console.log("race finished");
+		serverLog("race finished");
 		// sometimes the server had to restart, so people might be on zombie races
 		if (!activeRaces[raceID] || !activeRaces[raceID].users[userID]) {
 			socket.emit("force_refresh", "Tried to finish a nonexistent race... try refreshing the webpage.");
@@ -265,7 +288,7 @@ io.on("connection", function(socket) {
 		activeRaces[raceID].users[userID].finishTime = duration;
 		activeRaces[raceID].users[userID].progress = progress;
 		activeRaces[raceID].users[userID].state = UserStates.FINISHED;
-		console.log("!!! " + userID +  " FINISHED !!!");
+		serverLog("!!! " + userID +  " FINISHED !!!");
 		
 		// update the number of finished racers, which is also the user's placement in the race
 		activeRaces[raceID].finishedRacers++;
@@ -297,7 +320,7 @@ io.on("connection", function(socket) {
 	
 	
 	socket.on("test request", function() {
-		console.log("  * GOT REQUEST!");
+		serverLog("  * GOT REQUEST!");
 		socket.emit("test receive", "lorem ipsum herp derp");
 	});
 });
