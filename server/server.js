@@ -325,13 +325,13 @@ io.on("connection", function(socket) {
 		checkLogin(username, password, function(returnValue) {
 			if (returnValue === 1) {
 				// success; emit something
-				console.log("successful login");
+				serverLog("successful login");
 			} else if (returnValue === 0) {
 				// wrong password; emit something
-				console.log("incorrect password");
+				serverLog("incorrect password");
 			} else {
 				// wrong username; emit something
-				console.log("incorrect username");
+				serverLog("incorrect username");
 			}
 		});
 	});
@@ -362,10 +362,10 @@ let url = "mongodb://localhost:27017/coderacerdb";
 function addUser(uname, dispName, userEmail, pass) {
 	MongoClient.connect(url, null, (err, db) => {
 		if (err) {
-			console.log("ERROR: addUser: connect: ", err);
+			serverLog("ERROR: addUser: connect: ", err);
 			return;
 		}
-		console.log("SUCCESS: addUser: connect: ", url);
+		serverLog("SUCCESS: addUser: connect: ", url);
 		let collection = db.collection("users");
 		let today = new Date();
 		let newStats = { wpm: 0, wpm10: 0, numRaces: 0 };
@@ -381,11 +381,11 @@ function addUser(uname, dispName, userEmail, pass) {
 		};
 		collection.insertOne(user, null, (err, result) => {
 			if (err) {
-				console.log("ERROR: addUser: insertOne: ", err);
+				serverLog("ERROR: addUser: insertOne: ", err);
 				db.close();
 				return;
 			}
-			console.log("SUCCESS: addUser: insertOne: ", "<opt. result text>");
+			serverLog("SUCCESS: addUser: insertOne: ", "<opt. result text>");
 			db.close();
 		});
 	});
@@ -423,20 +423,20 @@ function checkLogin(uname, pword, returnFunction) {
 function updateUserDisplayName(uname, dispName) {
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
-			console.log("ERROR: updateUserDisplayName: connect: ", err);
+			serverLog("ERROR: updateUserDisplayName: connect: ", err);
 			return;
 		} 
-		console.log("SUCCESS: updateUserDisplayName: connect: ", url);
+		serverLog("SUCCESS: updateUserDisplayName: connect: ", url);
 		let collection = db.collection("users");
 		collection.updateOne({ username: uname },
 			{ $set: { displayName: dispName } },
 			(err, result) => {
 				if (err) {
-					console.log("ERROR: updateUserDisplayName: updateOne: ", err);
+					serverLog("ERROR: updateUserDisplayName: updateOne: ", err);
 					db.close();
 					return;
 				}
-				console.log("SUCCESS: updateUserDisplayName: updateOne: ", "<opt. result text>");
+				serverLog("SUCCESS: updateUserDisplayName: updateOne: ", "<opt. result text>");
 				db.close();
 			});
 	});
@@ -446,20 +446,20 @@ function updateUserDisplayName(uname, dispName) {
 function updateUserEmail(uname, userEmail) {
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
-			console.log("ERROR: updateUserEmail: connect: ", err);
+			serverLog("ERROR: updateUserEmail: connect: ", err);
 			return;
 		} 
-		console.log("SUCCESS: updateUserEmail: connect: ", url);
+		serverLog("SUCCESS: updateUserEmail: connect: ", url);
 		let collection = db.collection("users");
 		collection.updateOne({ username: uname },
 			{ $set: { email: userEmail } },
 			(err, result) => {
 				if (err) {
-					console.log("ERROR: updateUserEmail: updateOne: ", err);
+					serverLog("ERROR: updateUserEmail: updateOne: ", err);
 					db.close();
 					return;
 				}
-				console.log("SUCCESS: updateUserEmail: updateOne: ", "<opt. result text>");
+				serverLog("SUCCESS: updateUserEmail: updateOne: ", "<opt. result text>");
 				db.close();
 			});
 	});
@@ -469,20 +469,20 @@ function updateUserEmail(uname, userEmail) {
 function updateUserPassword(uname, pass) {
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
-			console.log("ERROR: updateUserPassword: connect: ", err);
+			serverLog("ERROR: updateUserPassword: connect: ", err);
 			return;
 		}
-		console.log("SUCCESS: updateUserPassword: connect: ", url);
+		serverLog("SUCCESS: updateUserPassword: connect: ", url);
 		let collection = db.collection("users");
 		collection.updateOne({ username: uname },
 			{ $set: { password: pass } },
 			(err, result) => {
 				if (err) {
-					console.log("ERROR: updateUserPassword: updateOne: ", err);
+					serverLog("ERROR: updateUserPassword: updateOne: ", err);
 					db.close();
 					return;
 				}
-				console.log("SUCCESS: updateUserPassword: updateOne: ", "<opt. result text>");
+				serverLog("SUCCESS: updateUserPassword: updateOne: ", "<opt. result text>");
 				db.close();
 			});
 	});
@@ -494,10 +494,10 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 	// connect to database
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
-			console.log("ERROR: addRaceToHistory: connect: ", err);
+			serverLog("ERROR: addRaceToHistory: connect: ", err);
 			return;
 		}
-		console.log("SUCCESS: addRaceToHistory: connect: ", url);
+		serverLog("SUCCESS: addRaceToHistory: connect: ", url);
 		let collection = db.collection("users");
 		let today = new Date();
 		for (let i = 0; i < racers.length; i++) {
@@ -505,11 +505,11 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 			collection.findOne({ username: racers[i] },
 				(err, doc) => {
 					if (err) {
-						console.log("ERROR: addRaceToHistory: findOne: ", err);
+						serverLog("ERROR: addRaceToHistory: findOne: ", err);
 						db.close();
 						return;
 					} 
-					console.log("SUCCESS: addRaceToHistory: findOne: ", "<opt. result text>");
+					serverLog("SUCCESS: addRaceToHistory: findOne: ", "<opt. result text>");
 					let num = doc.history.length;
 					let historyEntry = {
 						participants: racers,
@@ -526,11 +526,11 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 						{ $push: { history: historyEntry } },
 						(err, result) => {
 							if (err) {
-								console.log("ERROR: addRaceToHistory: updateOne: history: ", err);
+								serverLog("ERROR: addRaceToHistory: updateOne: history: ", err);
 								db.close();
 								return;
 							}
-							console.log("SUCCESS: addRaceToHistory: updateOne: history: ", "<opt. result text>");
+							serverLog("SUCCESS: addRaceToHistory: updateOne: history: ", "<opt. result text>");
 							let sum = historyEntry.wpm;
 							let sum10 = historyEntry.wpm;
 							let num10 = 1;
@@ -555,11 +555,11 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 								{ $set: {stats: newStats } },
 								(err, result) => {
 									if (err) {
-										console.log("ERROR: addRaceToHistory: updateOne: stats: ", err);
+										serverLog("ERROR: addRaceToHistory: updateOne: stats: ", err);
 										db.close();
 										return;
 									}
-									console.log("SUCCESS: addRaceToHistory: updateOne: stats: ", "<opt. result text>");
+									serverLog("SUCCESS: addRaceToHistory: updateOne: stats: ", "<opt. result text>");
 									// this is pretty jank, not sure if any other way tho b/c callback
 									if (i == racers.length - 1) {
 										db.close();
