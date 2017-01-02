@@ -3,17 +3,6 @@
 let MongoClient = require("mongodb").MongoClient;
 let url = "mongodb://localhost:27017/coderacerdb";
 
-addUser("eric", "megaspazz", "erik@somewhere.com", "weird");
-updateUserDisplayName("eric", "erik");
-updateUserEmail("erik", "updated@gmail.com");
-updateUserPassword("erik", "newPass");
-
-addRaceToHistory(["Guest", "Guest", "eric"],
-	[3, 2, 1],
-	[20, 30, 300],
-	[15, 20, 100],
-	"de_dust2");
-
 // TODO: for all functions, first verify validity of args
 	// when updating user, verify user exists? current implementation is
 	// it will just do nothing
@@ -122,10 +111,10 @@ function updateUserPassword(uname, pass) {
 	});
 }
 
-// NOT TOTALLY GR8
 // figure out global history list
 // figure out how to close the database
 function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
+	// connect to database
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
 			console.log("ERROR: addRaceToHistory: connect: ", err);
@@ -135,9 +124,7 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 		let collection = db.collection("users");
 		let today = new Date();
 		for (let i = 0; i < racers.length; i++) {
-			if (racers[i] === "Guest") {
-				continue;
-			}
+			// find the ith user's profile
 			collection.findOne({ username: racers[i] },
 				(err, doc) => {
 					if (err) {
@@ -156,6 +143,8 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 						raceNumber: num + 1,
 						date: today
 					};
+					// update the history with new entry
+					// calculate stats
 					collection.updateOne( {username: racers[i] },
 						{ $push: { history: historyEntry } },
 						(err, result) => {
@@ -184,6 +173,7 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 								wpm10: pastTenWpm,
 								numRaces: num
 							};
+							// update the stats
 							collection.updateOne( { username: racers[i] },
 								{ $set: {stats: newStats } },
 								(err, result) => {
@@ -193,8 +183,8 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 										return;
 									}
 									console.log("SUCCESS: addRaceToHistory: updateOne: stats: ", "<opt. result text>");
+									// this is pretty jank, not sure if any other way tho b/c callback
 									if (i == racers.length - 1) {
-										// PROBLEM: won't be reached if last is guest
 										db.close();
 									}
 								})

@@ -378,4 +378,30 @@ function quitRace() {
 
 $("#btnQuitRace").click(quitRace);
 
+// RANDO STUFF
+
+function createAccount() {
+	console.log("u pushed the button");
+	// make the confirm pass actually do something
+	let u = $("#username").val();
+	let p = $("#password").val();
+	let e = $("#email").val();
+	let dname = $("#displayName").val();
+
+	socket.emit("create_account", u, p, e, dname);
+}
+
+$("#createAcctBtn").click(createAccount);
+
+function login() {
+	console.log("attempting to login");
+
+	let u = $("#loginUsername").val();
+	let p = $("#loginPassword").val();
+	socket.emit("login", u, p);
+}
+$("#loginBtn").click(login);
+
+// END RANDO STUFF
+
 $(window).on("beforeunload", quitRace);

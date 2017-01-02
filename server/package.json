@@ -1,6 +1,6 @@
 {
 	"name": "coderacer",
-	"priavte": true,
+	"private": "true",
 	"version": "1.0.0",
 	"description": "server for coderacer website",
 	"main": "server.js",
