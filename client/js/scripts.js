@@ -11,8 +11,13 @@ const Correctness = {
 	CORRECT: 2
 }
 
-// requires socket.io to be loaded first
-var socket = io();
+const LoginResult = {
+	CORRECT_LOGIN: 1,
+	INCORRECT_PASS: 0,
+	INCORRECT_USER: -1
+}
+
+var socket = io();		// requires socket.io to be loaded first
 
 var currentState = States.NONE;
 
@@ -381,7 +386,7 @@ $("#btnQuitRace").click(quitRace);
 // RANDO STUFF
 
 function createAccount() {
-	console.log("u pushed the button");
+	// TODO: check for empty forms
 	// make the confirm pass actually do something
 	let u = $("#username").val();
 	let p = $("#password").val();
@@ -394,13 +399,26 @@ function createAccount() {
 $("#createAcctBtn").click(createAccount);
 
 function login() {
-	console.log("attempting to login");
-
 	let u = $("#loginUsername").val();
 	let p = $("#loginPassword").val();
+
+	$("#loginUsername").val("");
+	$("#loginPassword").val("");
 	socket.emit("login", u, p);
 }
 $("#loginBtn").click(login);
+
+socket.on("login_result", function(result, username) {
+	if (result === LoginResult.CORRECT_LOGIN) {
+		currentUserID = username;
+		console.log("user id = " + currentUserID);
+		$("#loginStatus").html("You are now logged in as <strong>" + username + "</strong>.");
+	} else if (result === LoginResult.INCORRECT_PASS) {
+		$("#loginStatus").html("Wrong password. Try again.");
+	} else {
+		$("#loginStatus").html("CodeRacer doesn't recognize that username. Try again");
+	}
+})
 
 // END RANDO STUFF
 

@@ -5,8 +5,7 @@ var app = express();
 var http = require("http").Server(app);
 var io = require("socket.io")(http);
 
-// filesystem
-var fs = require("fs");
+var fs = require("fs");						// filesystem
 
 const UserStates = {
 	NONE: 0,
@@ -16,12 +15,15 @@ const UserStates = {
 	QUIT: 4
 }
 
+const LoginResult = {
+	CORRECT_LOGIN: 1,
+	INCORRECT_PASS: 0,
+	INCORRECT_USER: -1
+}
+
 const PRE_RACE_TIME = 10000;
-
 const PORT = 1997;
-
 const CLIENT_PATH = path.resolve(__dirname + "/../client");
-
 const RACE_TEXTS_PATH = __dirname + "/race_texts";
 
 var activeRaces = { };
@@ -104,6 +106,15 @@ function checkRaceCompleted(raceID) {
 	}
 	if (done) {
 		// robon saves match into history table
+
+		let statsMap = { };
+
+		for (let id in activeRaces[raceID].users) {
+			statsMap[id] = activeRaces[raceID].users[id].stats;
+		}
+
+		addRaceToHistory(statsMap, activeRaces[raceID].raceText);
+
 		serverLog("*** " + raceID + " ALL DONE ***");
 		for (let id in activeRaces[raceID].users) {
 			let user = activeRaces[raceID].users[id];
@@ -128,8 +139,6 @@ function getUsersInRace(raceID) {
 	}
 	return usersInRace;
 }
-
-
 
 io.on("connection", function(socket) {
 	serverLog("+ CONNECTION @ " + socket.request.connection.remoteAddress);
@@ -299,18 +308,16 @@ io.on("connection", function(socket) {
 		
 		// calculate the accuracy
 		let accuracyRating = progress.numCorrectKeys / (progress.numCorrectKeys + progress.numWrongKeys);
-		
-		// robon does individual user statistics
-		//
-		//
-		
-		
+
 		let stats = {
 			time: duration,
 			rank: placement,
 			accuracy: accuracyRating,
 			charsPerMin: cpm
 		}
+
+		activeRaces[raceID].users[userID].stats = stats;
+
 		socket.emit("race_done", stats);
 		
 		checkRaceCompleted(raceID);
@@ -318,21 +325,19 @@ io.on("connection", function(socket) {
 
 	// BEGIN RANDO STUFF
 	socket.on("create_account", function(username, password, email, displayName) {
-		addUser(username, displayName, email, password)
+		addUser(username, displayName, email, password);
+
+		// TODO: add 'protection' here later so we know if user was actually
+		// successfully added
+		socket.emit("login_result", 1, username);
 	});
 
 	socket.on("login", function(username, password) {
 		checkLogin(username, password, function(returnValue) {
-			if (returnValue === 1) {
-				// success; emit something
-				serverLog("successful login");
-			} else if (returnValue === 0) {
-				// wrong password; emit something
-				serverLog("incorrect password");
-			} else {
-				// wrong username; emit something
-				serverLog("incorrect username");
-			}
+			//  1 -> success
+			//  0 -> failed password
+			// -1 -> failed username
+			socket.emit("login_result", returnValue, username);
 		});
 	});
 	
@@ -391,28 +396,18 @@ function addUser(uname, dispName, userEmail, pass) {
 	});
 }
 
-// bingo bongo log in
-// returns 1 if correct login
-// returns 0 if incorrect password
-// returns -1 if username not found
 function checkLogin(uname, pword, returnFunction) {
 	MongoClient.connect(url, (err, db) => {
 		let collection = db.collection("users");
 		
-		/* why doesnt this work
-		uname = "\"" + uname + "\"";
-		let query = {"username" : uname};
-		*/
-
-		let query = {};
-		query["username"] = uname;
+		let query = { username : uname };
 		collection.find(query).toArray((err, items) => {
 			if (items.length === 0) {
-				returnFunction(-1);
+				returnFunction(LoginResult.INCORRECT_USER);
 			} else if (items[0]["password"] === pword) {
-				returnFunction(1);
+				returnFunction(LoginResult.CORRECT_LOGIN);
 			} else {
-				returnFunction(0);
+				returnFunction(LoginResult.INCORRECT_PASS);
 			}
 		});
 		
@@ -438,7 +433,8 @@ function updateUserDisplayName(uname, dispName) {
 				}
 				serverLog("SUCCESS: updateUserDisplayName: updateOne: ", "<opt. result text>");
 				db.close();
-			});
+			}
+		);
 	});
 }
 
@@ -461,7 +457,8 @@ function updateUserEmail(uname, userEmail) {
 				}
 				serverLog("SUCCESS: updateUserEmail: updateOne: ", "<opt. result text>");
 				db.close();
-			});
+			}
+		);
 	});
 }
 
@@ -484,13 +481,13 @@ function updateUserPassword(uname, pass) {
 				}
 				serverLog("SUCCESS: updateUserPassword: updateOne: ", "<opt. result text>");
 				db.close();
-			});
+			}
+		);
 	});
 }
 
 // figure out global history list
-// figure out how to close the database
-function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
+function addRaceToHistory(my_statsMap, raceTitle) {
 	// connect to database
 	MongoClient.connect(url, (err, db) => {
 		if (err) {
@@ -498,75 +495,22 @@ function addRaceToHistory(racers, rankings, wpms, accuracies, textTitle) {
 			return;
 		}
 		serverLog("SUCCESS: addRaceToHistory: connect: ", url);
-		let collection = db.collection("users");
-		let today = new Date();
-		for (let i = 0; i < racers.length; i++) {
-			// find the ith user's profile
-			collection.findOne({ username: racers[i] },
-				(err, doc) => {
-					if (err) {
-						serverLog("ERROR: addRaceToHistory: findOne: ", err);
-						db.close();
-						return;
-					} 
-					serverLog("SUCCESS: addRaceToHistory: findOne: ", "<opt. result text>");
-					let num = doc.history.length;
-					let historyEntry = {
-						participants: racers,
-						rank: rankings[i],
-						wpm: wpms[i],
-						accuracy: accuracies[i],
-						title: textTitle,
-						raceNumber: num + 1,
-						date: today
-					};
-					// update the history with new entry
-					// calculate stats
-					collection.updateOne( {username: racers[i] },
-						{ $push: { history: historyEntry } },
-						(err, result) => {
-							if (err) {
-								serverLog("ERROR: addRaceToHistory: updateOne: history: ", err);
-								db.close();
-								return;
-							}
-							serverLog("SUCCESS: addRaceToHistory: updateOne: history: ", "<opt. result text>");
-							let sum = historyEntry.wpm;
-							let sum10 = historyEntry.wpm;
-							let num10 = 1;
-							// note that "num" and "doc" refer to the document prior to pushing
-							// which is why we manually add the most recent document above
-							for (let j = num - 1; j >= 0; j--) {
-								if (num10 < 10) {
-									sum10 += doc.history[j].wpm;
-									num10++;
-								}
-								sum += doc.history[j].wpm;
-							}
-							let lifetimeWpm = sum / (num + 1);
-							let pastTenWpm = sum10 / num10;
-							let newStats = {
-								wpm: lifetimeWpm,
-								wpm10: pastTenWpm,
-								numRaces: num
-							};
-							// update the stats
-							collection.updateOne( { username: racers[i] },
-								{ $set: {stats: newStats } },
-								(err, result) => {
-									if (err) {
-										serverLog("ERROR: addRaceToHistory: updateOne: stats: ", err);
-										db.close();
-										return;
-									}
-									serverLog("SUCCESS: addRaceToHistory: updateOne: stats: ", "<opt. result text>");
-									// this is pretty jank, not sure if any other way tho b/c callback
-									if (i == racers.length - 1) {
-										db.close();
-									}
-								})
-						});
-				});
-		}
+		let collection = db.collection("globalHistory");
+		let timestamp = new Date();
+		let raceNumber = collection.count() + 1;
+		let race = {
+			statsMap: my_statsMap,
+			title: raceTitle,
+			id: raceNumber,
+		};
+		collection.insertOne(race, null, (err, result) => {
+			if (err) {
+				serverLog("ERROR: addRaceToHistory: insertOne: ", err);
+				db.close();
+				return;
+			}
+			serverLog("SUCCESS: addRaceToHistory: insertOne: ", "<opt. result text>");
+			db.close();
+		});
 	});
 }
