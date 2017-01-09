@@ -113,7 +113,7 @@ function checkRaceCompleted(raceID) {
 			statsMap[id] = activeRaces[raceID].users[id].stats;
 		}
 
-		addRaceToHistory(statsMap, activeRaces[raceID].raceText);
+		addRaceToHistory(statsMap, activeRaces[raceID].raceTextTitle);
 
 		serverLog("*** " + raceID + " ALL DONE ***");
 		for (let id in activeRaces[raceID].users) {
@@ -152,6 +152,7 @@ io.on("connection", function(socket) {
 			let fileNum = ~~(Math.random() * fileNames.length);
 			let fullFilePath = path.join(RACE_TEXTS_PATH, fileNames[fileNum]);
 			let codeText = fs.readFileSync(fullFilePath, "utf8");
+			let selectedText = fileNames[fileNum];
 
 			serverLog(fileNames);
 			serverLog(fileNames[fileNum]);
@@ -162,6 +163,7 @@ io.on("connection", function(socket) {
 				startTime: null,
 				finishedRacers: 0,
 				codeFile: fileNames[fileNum],
+				raceTextTitle: selectedText,
 				raceText: codeText
 			};
 		}
@@ -410,6 +412,7 @@ function checkLogin(uname, pword, returnFunction) {
 				returnFunction(LoginResult.INCORRECT_PASS);
 			}
 		});
+		db.close();	// dont actually know if this does anything
 		
 	});
 }
@@ -497,12 +500,33 @@ function addRaceToHistory(my_statsMap, raceTitle) {
 		serverLog("SUCCESS: addRaceToHistory: connect: ", url);
 		let collection = db.collection("globalHistory");
 		let timestamp = new Date();
-		let raceNumber = collection.count() + 1;
+		let raceNumber = 0;
+		collection.count((err, count) => {
+			raceNumber = count + 1;
+		});
 		let race = {
 			statsMap: my_statsMap,
 			title: raceTitle,
 			id: raceNumber,
 		};
+		// add raceNumber to everyone that was in the race
+		let userCollection = db.collection("users");
+		for (let id in my_statsMap) {
+			userCollection.updateOne({ username: id },
+				{ $push: { history: raceNumber } },
+				(err, result) => {
+					if (err) {
+						serverLog("ERROR: addRaceToHistory: updateOne: ", err);
+						db.close();
+						return;
+					}
+					serverLog("SUCCESS: addRaceToHistory: updateOne: ", "<opt. result text>");
+					db.close();
+				}
+			);
+		}
+
+		// add race to globalHistory
 		collection.insertOne(race, null, (err, result) => {
 			if (err) {
 				serverLog("ERROR: addRaceToHistory: insertOne: ", err);
