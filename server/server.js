@@ -115,6 +115,8 @@ function checkRaceCompleted(raceID) {
 
 		addRaceToHistory(statsMap, activeRaces[raceID].raceTextTitle);
 
+		// end of saving into database
+
 		serverLog("*** " + raceID + " ALL DONE ***");
 		for (let id in activeRaces[raceID].users) {
 			let user = activeRaces[raceID].users[id];
@@ -143,8 +145,36 @@ function getUsersInRace(raceID) {
 io.on("connection", function(socket) {
 	serverLog("+ CONNECTION @ " + socket.request.connection.remoteAddress);
 
-	socket.on("race_request", function(raceID, userID) {
+	socket.on("race_request", function(userID) {
 		serverLog("got race request");
+
+		// begin rodger's trollerino
+
+		let raceID;
+		let foundRace = false;
+
+		for (let activeRaceID in activeRaces) {
+			// first clause checks if there is a race that hasn't started yet
+			// second clause checks if the race has less than 5 people in it
+			if ((activeRaces[activeRaceID].startTime == null ||
+				Date.now() < activeRaces[activeRaceID].startTime) &&
+				Object.keys(activeRaces[activeRaceID].users).length < 5) {
+				raceID = activeRaceID;
+				foundRace = true;
+				break;
+			}
+		}
+
+		// if haven't found a race yet, start a new race (new raceID)
+		if (!foundRace) {
+			raceID = Math.random();
+			while (activeRaces[raceID]) {
+				raceID = Math.random(); // generate ID until unique one
+										//(that doesn't exist already) is found
+			}
+		}
+
+		// end rodger's trollerino
 
 		if (!activeRaces[raceID]) {
 			// actually get a random race text

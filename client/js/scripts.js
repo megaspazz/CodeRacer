@@ -145,7 +145,6 @@ function getLines(txt) {
 // end of roger's kool stuff
 
 function reportProgress() {
-	//console.log("reporting progress");
 	if (currentState === States.IN_RACE || currentState === States.FINISHED) {
 		console.log("    in race!");
 		socket.emit("progress_report", currentRaceID, currentUserID, myProgress);
@@ -371,10 +370,7 @@ socket.on("force_refresh", function(msg) {
 });
 
 $("#btnRequestRace").click(function() {
-	var raceID = prompt("Enter the race ID you want to join:", 1997);
-	if (raceID) {
-		socket.emit("race_request", raceID, currentUserID);
-	}
+	socket.emit("race_request", currentUserID);
 });
 
 function quitRace() {
