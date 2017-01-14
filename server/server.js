@@ -12,7 +12,8 @@ const UserStates = {
 	STARTING: 1,
 	STARTED: 2,
 	FINISHED: 3,
-	QUIT: 4
+	QUIT: 4,
+	TIMEOUT: 5
 }
 
 const LoginResult = {
@@ -22,6 +23,9 @@ const LoginResult = {
 }
 
 const PRE_RACE_TIME = 10000;
+const UPDATE_INTERVAL_TIME = 1000;
+const MAX_RACE_TIME = 300000;
+
 const PORT = 1997;
 const CLIENT_PATH = path.resolve(__dirname + "/../client");
 const RACE_TEXTS_PATH = __dirname + "/race_texts";
@@ -82,7 +86,7 @@ function getRaceStateFunction(raceID, userID) {
 	}
 }
 
-function getStartRaceFunction(raceID, userID) {
+function getStartRaceFunction_OLD(raceID, userID) {
 	return function() {
 		if (activeRaces[raceID]) {
 			let user = activeRaces[raceID].users[userID];
@@ -90,6 +94,57 @@ function getStartRaceFunction(raceID, userID) {
 				user.state = UserStates.STARTED;
 				user.connection.emit("start_race", raceID, activeRaces[raceID].raceText);
 			}
+		}
+	}
+}
+
+function getStartRaceFunction(raceID) {
+	return function() {
+		if (activeRaces[raceID]) {
+			for (let userID in activeRaces[raceID].users) {
+				let user = activeRaces[raceID].users[userID];
+				if (user && user.state == UserStates.STARTING) {
+					user.state = UserStates.STARTED;
+					user.connection.emit("start_race", raceID, activeRaces[raceID].raceText);
+				}
+			}
+			let progressUpdateFcn = getProgressUpdateFunction(raceID);
+			activeRaces[raceID].updateIntervalID = setInterval(progressUpdateFcn, UPDATE_INTERVAL_TIME);
+		}
+	}
+}
+
+function getProgressUpdateFunction(raceID) {
+	return function() {
+		if (!activeRaces[raceID]) {
+			// something bad happened, and now it's stuck in an interval
+			// if this actually happens, we can change this to be a timeout instead of interval
+			serverLog("PRETTY SERIOUS ERROR!  Interval is stuck infinite looping!");
+			return;
+		}
+		serverLog("sending progress");
+		let race = activeRaces[raceID];
+		let now = Date.now();
+		let elapsedTime = now - race.startTime;
+		
+		// check if the race has timed out
+		if (elapsedTime > MAX_RACE_TIME) {
+			for (let userID in race.users) {
+				let user = race.users[userID];
+				// kick the users who aren't done yet, although they can probably only be in STARTED state at this point
+				if (userState === UserStates.NONE || userState === UserStates.STARTING || userState === UserStates.STARTED) {
+					user.state = UserStates.TIMEOUT;
+				}
+			}
+			completeRace(raceID);
+			return;
+		}
+		
+		// send progress to all users in the race
+		let userProgresses = getUserProgresses(raceID);
+		for (let userID in activeRaces[raceID].users) {
+			let user = activeRaces[raceID].users[userID];
+			user.connection.emit("race_state", raceID, userProgresses);
 		}
 	}
 }
@@ -105,27 +160,35 @@ function checkRaceCompleted(raceID) {
 		}
 	}
 	if (done) {
-		// robon saves match into history table
-
-		let statsMap = { };
-
-		for (let id in activeRaces[raceID].users) {
-			statsMap[id] = activeRaces[raceID].users[id].stats;
-		}
-
-		addRaceToHistory(statsMap, activeRaces[raceID].raceTextTitle);
-
-		// end of saving into database
-
-		serverLog("*** " + raceID + " ALL DONE ***");
-		for (let id in activeRaces[raceID].users) {
-			let user = activeRaces[raceID].users[id];
-			let userProgresses = getUserProgresses(raceID);
-			user.connection.emit("race_all_done", raceID, userProgresses);
-		}
-		delete activeRaces[raceID];
+		completeRace(raceID);
 	}
 	return done;
+}
+
+function completeRace(raceID) {
+	// stop the progress update interval
+	
+	clearInterval(activeRaces[raceID].updateIntervalID);
+	
+	// robon saves match into history table
+
+	let statsMap = { };
+
+	for (let id in activeRaces[raceID].users) {
+		statsMap[id] = activeRaces[raceID].users[id].stats;
+	}
+
+	addRaceToHistory(statsMap, activeRaces[raceID].raceTextTitle);
+
+	// end of saving into database
+
+	serverLog("*** " + raceID + " ALL DONE ***");
+	for (let id in activeRaces[raceID].users) {
+		let user = activeRaces[raceID].users[id];
+		let userProgresses = getUserProgresses(raceID);
+		user.connection.emit("race_all_done", raceID, userProgresses);
+	}
+	delete activeRaces[raceID];
 }
 
 function checkRaceStarted(raceID) {
@@ -157,8 +220,8 @@ io.on("connection", function(socket) {
 			// first clause checks if there is a race that hasn't started yet
 			// second clause checks if the race has less than 5 people in it
 			if ((activeRaces[activeRaceID].startTime == null ||
-				Date.now() < activeRaces[activeRaceID].startTime) &&
-				Object.keys(activeRaces[activeRaceID].users).length < 5) {
+					Date.now() < activeRaces[activeRaceID].startTime) &&
+					Object.keys(activeRaces[activeRaceID].users).length < 5) {
 				raceID = activeRaceID;
 				foundRace = true;
 				break;
@@ -167,11 +230,9 @@ io.on("connection", function(socket) {
 
 		// if haven't found a race yet, start a new race (new raceID)
 		if (!foundRace) {
-			raceID = Math.random();
-			while (activeRaces[raceID]) {
-				raceID = Math.random(); // generate ID until unique one
-										//(that doesn't exist already) is found
-			}
+			do {
+				raceID = Math.random();     // generate ID until unique one
+			} while (activeRaces[raceID]);  // (that doesn't exist already) is found
 		}
 
 		// end rodger's trollerino
@@ -186,11 +247,12 @@ io.on("connection", function(socket) {
 
 			serverLog(fileNames);
 			serverLog(fileNames[fileNum]);
-			serverLog(codeText);
+			serverLog("SEE CODE BELOW!\n" + codeText);
 
 			activeRaces[raceID] = {
 				users: { },
 				startTime: null,
+				updateIntervalID: null,
 				finishedRacers: 0,
 				codeFile: fileNames[fileNum],
 				raceTextTitle: selectedText,
@@ -233,6 +295,9 @@ io.on("connection", function(socket) {
 				let now = Date.now();
 				var time = now + PRE_RACE_TIME;
 				activeRaces[raceID].startTime = time;
+				// #domenow
+				let startRaceFn = getStartRaceFunction(raceID);
+				setTimeout(startRaceFn, PRE_RACE_TIME);
 			}
 			
 			let usersInRace = getUsersInRace(raceID);
@@ -243,8 +308,8 @@ io.on("connection", function(socket) {
 					user.state = UserStates.STARTING;
 					let now = Date.now();
 					let remainingTime = Math.max(0, activeRaces[raceID].startTime - now);
-					let startRaceFn = getStartRaceFunction(raceID, userID);
-					setTimeout(startRaceFn, remainingTime);
+					//let startRaceFn = getStartRaceFunction(raceID, userID);
+					//setTimeout(startRaceFn, remainingTime);
 					serverLog("remaining time = " + remainingTime);
 					user.connection.emit("start_race_timer", raceID, remainingTime, usersInRace);
 				} else if (user.state === UserStates.STARTING) {

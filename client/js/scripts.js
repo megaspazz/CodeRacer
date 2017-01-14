@@ -145,13 +145,14 @@ function getLines(txt) {
 // end of roger's kool stuff
 
 function reportProgress() {
-	if (currentState === States.IN_RACE || currentState === States.FINISHED) {
+	if (currentState === States.IN_RACE) {
 		console.log("    in race!");
 		socket.emit("progress_report", currentRaceID, currentUserID, myProgress);
-	}
-	if (currentState !== States.NONE) {
 		setTimeout(reportProgress, 1000);
 	}
+	//if (currentState !== States.NONE) {
+	//	setTimeout(reportProgress, 1000);
+	//}
 }
 
 function activateLine(activeLine) {
@@ -207,7 +208,6 @@ socket.on("start_race_timer", function(raceID, countdownTime, usersInRace) {
 		var now = Date.now();
 		currentRaceStartTimeMS = new Date(now + countdownTime);
 		countdownIntervalID = setInterval(updateCountdown, 40);
-		reportProgress();    // only report progress when the race actually starts
 		
 		updateCurrentUsersInRace(usersInRace);
 	}
@@ -302,6 +302,8 @@ socket.on("start_race", function(raceID, raceText) {
 	usertextbox.prop("disabled", false);
 	usertextbox.text("");
 	usertextbox.focus();
+	
+	reportProgress();    // report progress when the race actually starts
 });
 
 function updateProgresses(userProgresses) {
