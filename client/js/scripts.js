@@ -334,8 +334,11 @@ socket.on("race_done", function(stats) {
 
 socket.on("race_all_done", function(raceID, userProgresses) {
 	console.log("race all done from server!");
+	console.log(raceID + " ?= " + currentRaceID);
+	console.log(typeof(raceID) + " ?= " + typeof(currentRaceID));
 	if (raceID === currentRaceID) {
 		// do end-of-race things here
+		console.log("all update race kek");
 		updateProgresses(userProgresses);
 		currentState = States.NONE;
 	}

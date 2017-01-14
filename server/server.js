@@ -26,6 +26,8 @@ const PRE_RACE_TIME = 10000;
 const UPDATE_INTERVAL_TIME = 1000;
 const MAX_RACE_TIME = 300000;
 
+const MAX_RACE_SIZE = 5;
+
 const PORT = 1997;
 const CLIENT_PATH = path.resolve(__dirname + "/../client");
 const RACE_TEXTS_PATH = __dirname + "/race_texts";
@@ -212,7 +214,7 @@ io.on("connection", function(socket) {
 		serverLog("got race request");
 
 		// begin rodger's trollerino
-
+		
 		let raceID;
 		let foundRace = false;
 
@@ -221,7 +223,7 @@ io.on("connection", function(socket) {
 			// second clause checks if the race has less than 5 people in it
 			if ((activeRaces[activeRaceID].startTime == null ||
 					Date.now() < activeRaces[activeRaceID].startTime) &&
-					Object.keys(activeRaces[activeRaceID].users).length < 5) {
+					Object.keys(activeRaces[activeRaceID].users).length < MAX_RACE_SIZE) {
 				raceID = activeRaceID;
 				foundRace = true;
 				break;
@@ -231,8 +233,8 @@ io.on("connection", function(socket) {
 		// if haven't found a race yet, start a new race (new raceID)
 		if (!foundRace) {
 			do {
-				raceID = Math.random();     // generate ID until unique one
-			} while (activeRaces[raceID]);  // (that doesn't exist already) is found
+				raceID = Math.random().toString();  // generate ID until unique one, must be a string!
+			} while (activeRaces[raceID]);          // (that doesn't exist already) is found
 		}
 
 		// end rodger's trollerino
@@ -295,7 +297,6 @@ io.on("connection", function(socket) {
 				let now = Date.now();
 				var time = now + PRE_RACE_TIME;
 				activeRaces[raceID].startTime = time;
-				// #domenow
 				let startRaceFn = getStartRaceFunction(raceID);
 				setTimeout(startRaceFn, PRE_RACE_TIME);
 			}
@@ -328,8 +329,9 @@ io.on("connection", function(socket) {
 		}
 
 		activeRaces[raceID].users[userID].progress = progress;
-		let userProgresses = getUserProgresses(raceID);
-		socket.emit("race_state", raceID, userProgresses);
+		
+		//let userProgresses = getUserProgresses(raceID);
+		//socket.emit("race_state", raceID, userProgresses);
 	});
 
 	socket.on("disconnect", function() {
