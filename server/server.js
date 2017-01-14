@@ -533,38 +533,37 @@ function addRaceToHistory(my_statsMap, raceTitle) {
 		let raceNumber = 0;
 		collection.count((err, count) => {
 			raceNumber = count + 1;
-		});
-		let race = {
-			statsMap: my_statsMap,
-			title: raceTitle,
-			id: raceNumber,
-		};
-		// add raceNumber to everyone that was in the race
-		let userCollection = db.collection("users");
-		for (let id in my_statsMap) {
-			userCollection.updateOne({ username: id },
-				{ $push: { history: raceNumber } },
-				(err, result) => {
-					if (err) {
-						serverLog("ERROR: addRaceToHistory: updateOne: ", err);
+			let race = {
+				statsMap: my_statsMap,
+				title: raceTitle,
+				id: raceNumber,
+			};
+			// add raceNumber to everyone that was in the race
+			let userCollection = db.collection("users");
+			for (let id in my_statsMap) {
+				userCollection.updateOne({ username: id },
+					{ $push: { history: raceNumber } },
+					(err, result) => {
+						if (err) {
+							serverLog("ERROR: addRaceToHistory: updateOne: ", err);
+							db.close();
+							return;
+						}
+						serverLog("SUCCESS: addRaceToHistory: updateOne: ", "<opt. result text>");
 						db.close();
-						return;
 					}
-					serverLog("SUCCESS: addRaceToHistory: updateOne: ", "<opt. result text>");
-					db.close();
-				}
-			);
-		}
-
-		// add race to globalHistory
-		collection.insertOne(race, null, (err, result) => {
-			if (err) {
-				serverLog("ERROR: addRaceToHistory: insertOne: ", err);
-				db.close();
-				return;
+				);
 			}
-			serverLog("SUCCESS: addRaceToHistory: insertOne: ", "<opt. result text>");
-			db.close();
+			// add race to globalHistory
+			collection.insertOne(race, null, (err, result) => {
+				if (err) {
+					serverLog("ERROR: addRaceToHistory: insertOne: ", err);
+					db.close();
+					return;
+				}
+				serverLog("SUCCESS: addRaceToHistory: insertOne: ", "<opt. result text>");
+				db.close();
+			});
 		});
 	});
 }
