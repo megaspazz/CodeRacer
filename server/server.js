@@ -26,6 +26,7 @@ const PRE_RACE_TIME = 10000;
 const UPDATE_INTERVAL_TIME = 1000;
 const MAX_RACE_TIME = 300000;
 
+const MIN_RACE_JOIN_TIME = 3000;
 const MAX_RACE_SIZE = 5;
 
 const PORT = 1997;
@@ -134,7 +135,7 @@ function getProgressUpdateFunction(raceID) {
 			for (let userID in race.users) {
 				let user = race.users[userID];
 				// kick the users who aren't done yet, although they can probably only be in STARTED state at this point
-				if (userState === UserStates.NONE || userState === UserStates.STARTING || userState === UserStates.STARTED) {
+				if (user.state === UserStates.NONE || user.state === UserStates.STARTING || user.state === UserStates.STARTED) {
 					user.state = UserStates.TIMEOUT;
 				}
 			}
@@ -219,10 +220,11 @@ io.on("connection", function(socket) {
 		let foundRace = false;
 
 		for (let activeRaceID in activeRaces) {
-			// first clause checks if there is a race that hasn't started yet
-			// second clause checks if the race has less than 5 people in it
+			// first line checks if there is a race that hasn't set a start time yet, so it has only one user
+			// second line checks if the race has more than the minimum amount of time before starting
+			// third line checks if the race has fewer than the maximum number of people in it
 			if ((activeRaces[activeRaceID].startTime == null ||
-					Date.now() < activeRaces[activeRaceID].startTime) &&
+					activeRaces[activeRaceID].startTime - Date.now() >= MIN_RACE_JOIN_TIME) &&
 					Object.keys(activeRaces[activeRaceID].users).length < MAX_RACE_SIZE) {
 				raceID = activeRaceID;
 				foundRace = true;
@@ -247,6 +249,7 @@ io.on("connection", function(socket) {
 			let codeText = fs.readFileSync(fullFilePath, "utf8");
 			let selectedText = fileNames[fileNum];
 
+			serverLog("new raceID = " + raceID);
 			serverLog(fileNames);
 			serverLog(fileNames[fileNum]);
 			serverLog("SEE CODE BELOW!\n" + codeText);

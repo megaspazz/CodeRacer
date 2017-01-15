@@ -142,6 +142,15 @@ function getLines(txt) {
 	return txt.split(/\r?\n/g);
 }
 
+function padRight(orig, padChar, targetLen) {
+	let str = String(orig);
+	let padLen = targetLen - str.length;
+	if (padLen <= 0) {
+		return str;
+	}
+	return str + padChar.repeat(padLen);
+}
+
 // end of roger's kool stuff
 
 function reportProgress() {
@@ -150,25 +159,16 @@ function reportProgress() {
 		socket.emit("progress_report", currentRaceID, currentUserID, myProgress);
 		setTimeout(reportProgress, 1000);
 	}
-	//if (currentState !== States.NONE) {
-	//	setTimeout(reportProgress, 1000);
-	//}
 }
 
 function activateLine(activeLine) {
 	var activeDiv = currentRaceLineDivs[activeLine];
 	activeDiv.addClass("currentLine");
-	var currentText = activeDiv.text();
-	var newText = ">" + currentText.substring(1);
-	activeDiv.text(newText);
 }
 
 function deactivateLine(inactiveLine) {
 	var inactiveDiv = currentRaceLineDivs[inactiveLine];
 	inactiveDiv.removeClass("currentLine");
-	var currentText = inactiveDiv.text();
-	var newText = "\xA0" + currentText.substring(1);
-	inactiveDiv.text(newText);
 }
 
 function updateCountdown() {
@@ -251,9 +251,20 @@ socket.on("start_race", function(raceID, raceText) {
 	currentState = States.IN_RACE;
 	
 	currentRaceLines = getLines(raceText);
-	currentRaceLineDivs = currentRaceLines.map(function(line) {
-		var lineText = line.replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;") || "&nbsp;";
-		var divLine = $("<div>&nbsp;&nbsp;" + lineText + "</div>");
+	
+	var lineTexts = currentRaceLines.map(function(line) {
+		return line.replace(/\t/g, "    ");
+	});
+	
+	var maxLineLength = lineTexts.reduce(function(maxSoFar, line) {
+		return Math.max(maxSoFar, line.length);
+	}, 0);
+	
+	console.log("max = " + maxLineLength);
+	
+	currentRaceLineDivs = lineTexts.map(function(line) {
+		var lineText = padRight(line, " ", maxLineLength).replace(/ /g, "&nbsp;");
+		var divLine = $("<div>" + lineText + "</div>");
 		divLine.addClass("codeLine");
 		return divLine;
 	});
@@ -285,11 +296,6 @@ socket.on("start_race", function(raceID, raceText) {
 		updateOpponentProgress(userID, 0);
 	}
 	
-	//$("#txtCode").text(currentRaceText);
-	//var codebox = $("#codebox");
-	//for (var i = 0; i < currentRaceLineDivs.length; i++) {
-	//	codebox.append(currentRaceLineDivs[i]);
-	//}
 	myProgress = {
 		currentLine: 0,
 		totalLines: currentRaceLines.length,		
