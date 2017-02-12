@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-<link rel="icon" href="assets/favicon.ico" />
-<link rel="stylesheet" type="text/css" href="css/styles.css" />
+	<link rel="icon" href="assets/favicon.ico" />
+	<link rel="stylesheet" type="text/css" href="css/styles.css" />
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous" />
 </head>
 <body>
 	<div id="topbanner">
@@ -11,7 +12,7 @@
 
 	<!-- RANDO STUFF -->
 	
-	<div id="createAcct" class="hidden">
+	<div id="createAcct" class="collapse">
 		Username: <input type="textbox" id="username" /> <br>
 		Password: <input type="textbox" id="password" /> <br>
 		Confirm Password: <input type="textbox" id="confirmpass" /> <br>
@@ -20,7 +21,7 @@
 		<button id="createAcctBtn">Create Account</button>
 	</div>
 
-	<div id="login" class="hidden">
+	<div id="login" class="collapse">
 		<p> Login </p>
 		Username: <input type="textbox" id="loginUsername" /> <br>
 		Password: <input type="textbox" id="loginPassword" /> <br>
@@ -30,41 +31,43 @@
 
 	<!-- END RANDO STUFF -->
 
-	<div>
-		<button id="btnRequestRace">Request Race</button>
-		<button id="btnQuitRace" disabled="disabled">Quit Race</button>
-	</div>
+	<div id="gameArea">
+		<div id="buttonsContainer">
+			<button id="btnRequestRace" class="btn btn-primary">Request Race</button>
+			<button id="btnQuitRace" disabled="disabled" class="btn btn-danger">Quit Race</button>
+		</div>
 
-	<input type="textbox" id="usertextbox" disabled="disabled" />
-	
-	<div id="countdown"></div>
-	
-	<div id="codebox" onmousedown="return false;" onselectstart="return false;"></div>
-	
-	<div id="stats" class="hidden">
-		<div>
-			<strong title="Placement in the race against other players">
-				Rank:
-			</strong>
-			<span id="statsRank"></span>
-		</div>
-		<div>
-			<strong title="Seconds taken to finish the code">
-				Time:
-			</strong>
-			<span id="statsTime"></span>
-		</div>
-		<div>
-			<strong title="Characters per minute">
-				CPM:
-			</strong>
-			<span id="statsCharsPerMin"></span>
-		</div>
-		<div>
-			<strong title="Percentage of keystrokes that contributed to completing the code">
-				Accuracy:
-			</strong>
-			<span id="statsAccuracy"></span>
+		<input type="textbox" id="usertextbox" disabled="disabled" />
+		
+		<div id="countdown"></div>
+		
+		<div id="codebox" onmousedown="return false;" onselectstart="return false;"></div>
+		
+		<div id="stats" class="collapse">
+			<div>
+				<strong title="Placement in the race against other players">
+					Rank:
+				</strong>
+				<span id="statsRank"></span>
+			</div>
+			<div>
+				<strong title="Seconds taken to finish the code">
+					Time:
+				</strong>
+				<span id="statsTime"></span>
+			</div>
+			<div>
+				<strong title="Characters per minute">
+					CPM:
+				</strong>
+				<span id="statsCharsPerMin"></span>
+			</div>
+			<div>
+				<strong title="Percentage of keystrokes that contributed to completing the code">
+					Accuracy:
+				</strong>
+				<span id="statsAccuracy"></span>
+			</div>
 		</div>
 	</div>
 

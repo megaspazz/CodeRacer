@@ -183,6 +183,7 @@ socket.on("found_race", function(raceID) {
 	currentState = States.WAITING_FOR_RACE;
 	$("#btnRequestRace").prop("disabled", true);
 	$("#btnQuitRace").prop("disabled", false);
+	$("#usertextbox").attr("placeholder", "Type the code below here when the race starts.");
 	$("#codebox").empty();
 	$("#countdown").text("waiting for competitors to join...");
 	$("#stats").hide();
@@ -249,6 +250,8 @@ socket.on("start_race", function(raceID, raceText) {
 	
 	$("#countdown").text("");
 	currentState = States.IN_RACE;
+	
+	$("#usertextbox").removeAttr("placeholder");
 	
 	currentRaceLines = getLines(raceText);
 	
