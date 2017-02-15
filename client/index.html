@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+	<title>
+		CodeRacer
+	</title>
 	<link rel="icon" href="assets/favicon.ico" />
 	<link rel="stylesheet" type="text/css" href="css/styles.css" />
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous" />
@@ -32,18 +35,20 @@
 	<!-- END RANDO STUFF -->
 
 	<div id="gameArea">
-		<div id="buttonsContainer">
-			<button id="btnRequestRace" class="btn btn-primary">Request Race</button>
-			<button id="btnQuitRace" disabled="disabled" class="btn btn-danger">Quit Race</button>
+		<div>
+			<div id="buttonsContainer" class="marginWidth">
+				<button id="btnFindRace" class="btn btn-primary buttonAction">Find Race</button>
+				<button id="btnQuitRace" class="btn btn-danger buttonAction collapse" disabled="disabled">Quit Race</button>
+			</div>
+			<div id="userTextBoxContainer">
+				<input type="textbox" id="usertextbox" disabled="disabled" />
+			</div>
+			<div id="countdown" class="marginShift"></div>
 		</div>
-
-		<input type="textbox" id="usertextbox" disabled="disabled" />
-		
-		<div id="countdown"></div>
 		
 		<div id="codebox" onmousedown="return false;" onselectstart="return false;"></div>
 		
-		<div id="stats" class="collapse">
+		<div id="stats" class="collapse marginShift">
 			<div>
 				<strong title="Placement in the race against other players">
 					Rank:

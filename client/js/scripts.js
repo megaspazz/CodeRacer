@@ -17,6 +17,8 @@ const LoginResult = {
 	INCORRECT_USER: -1
 }
 
+const MAX_RACE_SIZE = 5;
+
 var socket = io();		// requires socket.io to be loaded first
 
 var currentState = States.NONE;
@@ -51,6 +53,7 @@ var lastLineLength = null;
 // check user input, get progress, etc.
 
 function checkUserInput(event) {
+	setupUserTextBox();
 	var keyCode = event.keyCode || event.which;
 	var userText = $("#usertextbox").val();
 	var correctnessObj = getCorrectness(userText);
@@ -69,8 +72,10 @@ function checkUserInput(event) {
 				activateLine(myProgress.currentLine);
 			} else {
 				usertextbox.prop("disabled", true);
-				$("#btnRequestRace").prop("disabled", false);
+				$("#btnFindRace").prop("disabled", false);
+				$("#btnFindRace").show();
 				$("#btnQuitRace").prop("disabled", true);
+				$("#btnQuitRace").hide();
 				currentState = States.FINISHED;
 				socket.emit("race_finished", currentRaceID, currentUserID, myProgress);
 			}
@@ -99,11 +104,46 @@ function checkUserInput(event) {
 		// update this to be the most recent line length value
 		lastLineLength = userText.length;
 	}
+	setupUserTextBox();
 }
 
 $("#usertextbox").keydown(function(event) {
+	// make sure that the user isn't editing the automatically-inserted spacing at the beginning
+	var usertextbox = document.getElementById("usertextbox");
+	var spaces = getLeadingSpaces(currentRaceLines[myProgress.currentLine]);
+	usertextbox.selectionStart = Math.max(usertextbox.selectionStart, spaces);
+	
+	// check the user input in a timer callback so that the input will be part of the textbox
 	setTimeout(checkUserInput, 0, event);
 });
+
+function getLeadingSpaces(txt) {
+	var spaces = 0;
+	for (var i = 0; i < txt.length; ++i) {
+		if (txt[i] === "\t") {
+			spaces += 4;
+		} else if (txt[i] === " ") {
+			++spaces;
+		} else {
+			break;
+		}
+	}
+	return spaces;
+}
+
+function setupUserTextBox() {
+	if (myProgress.currentLine >= currentRaceLines.length) {
+		return;
+	}
+	var currLine = currentRaceLines[myProgress.currentLine];
+	var spaces = getLeadingSpaces(currLine);
+	var usertextbox = document.getElementById("usertextbox");
+	var currTxt = usertextbox.value;
+	if (currTxt.length < spaces) {
+		usertextbox.value = " ".repeat(spaces);
+	}
+	usertextbox.selectionStart = Math.max(usertextbox.selectionStart, spaces);
+}
 
 
 
@@ -117,10 +157,17 @@ function getCorrectness(txt) {
 }
 
 function getCorrectnessLength(txt) {
-	var trimmedLine = currentRaceLines[myProgress.currentLine].trim();
-	var len = Math.min(txt.length, trimmedLine.length);
+	var currLine = currentRaceLines[myProgress.currentLine];
+	var expectedSpaces = getLeadingSpaces(currLine);
+	var actualSpaces = getLeadingSpaces(txt);
+	if (expectedSpaces !== actualSpaces) {
+		return 0;
+	}
+	var trimmedLine = currLine.trim();
+	var fixedTxt = txt.trimLeft();
+	var len = Math.min(fixedTxt.length, trimmedLine.length);
 	for (var i = 0; i < len; i++) {
-		if (txt[i] != trimmedLine[i]) {
+		if (fixedTxt[i] != trimmedLine[i]) {
 			return i;
 		}
 	}
@@ -128,10 +175,14 @@ function getCorrectnessLength(txt) {
 }
 
 function checkCorrectness(txt) {
+	var currLine = currentRaceLines[myProgress.currentLine];
+	var expectedSpaces = getLeadingSpaces(currLine);
+	var actualSpaces = getLeadingSpaces(txt);
 	var trimmedLine = currentRaceLines[myProgress.currentLine].trim();
-	if (txt.length > trimmedLine.length || txt !== trimmedLine.substring(0, txt.length)) {
+	var fixedTxt = txt.trimLeft();
+	if (expectedSpaces !== actualSpaces || fixedTxt.length > trimmedLine.length || fixedTxt !== trimmedLine.substring(0, fixedTxt.length)) {
 		return Correctness.WRONG;
-	} else if (txt.length !== trimmedLine.length) {
+	} else if (fixedTxt.length !== trimmedLine.length) {
 		return Correctness.PARTIAL;
 	} else {
 		return Correctness.CORRECT;
@@ -143,8 +194,8 @@ function getLines(txt) {
 }
 
 function padRight(orig, padChar, targetLen) {
-	let str = String(orig);
-	let padLen = targetLen - str.length;
+	var str = String(orig);
+	var padLen = targetLen - str.length;
 	if (padLen <= 0) {
 		return str;
 	}
@@ -174,18 +225,20 @@ function deactivateLine(inactiveLine) {
 function updateCountdown() {
 	var currTime = new Date();
 	var remainingMS = currentRaceStartTimeMS - currTime.getTime();
-	$("#countdown").text("Countdown (seconds): " + (remainingMS / 1000).toFixed(3));
+	$("#countdown").text("Countdown: " + (remainingMS / 1000).toFixed(3) + " sec.");
 }
 
 socket.on("found_race", function(raceID) {
 	console.log("got request to start race from server");
 	currentRaceID = raceID;
 	currentState = States.WAITING_FOR_RACE;
-	$("#btnRequestRace").prop("disabled", true);
+	$("#btnFindRace").prop("disabled", true);
+	$("#btnFindRace").hide();
 	$("#btnQuitRace").prop("disabled", false);
-	$("#usertextbox").attr("placeholder", "Type the code below here when the race starts.");
+	$("#btnQuitRace").show();
+	$("#usertextbox").attr("placeholder", "Type each line of the code below here when the race starts!");
 	$("#codebox").empty();
-	$("#countdown").text("waiting for competitors to join...");
+	$("#countdown").text("Waiting for competitors to join...");
 	$("#stats").hide();
 });
 
@@ -272,6 +325,7 @@ socket.on("start_race", function(raceID, raceText) {
 		return divLine;
 	});
 	
+	var userCount = Object.keys(currentUsersInRace).length;
 	var codebox = $("#codebox");
 	containerDivs = [];
 	opponentDivs = [];
@@ -279,6 +333,13 @@ socket.on("start_race", function(raceID, raceText) {
 		var divContainer = $("<div></div>");
 		divContainer.addClass("lineContainer");
 		containerDivs.push(divContainer);
+		
+		// pad the space on the left if the race isn't full
+		for (var j = userCount; j < MAX_RACE_SIZE; ++j) {
+			var divOpponent = $("<div></div>");
+			divOpponent.addClass("opponent");
+			divContainer.append(divOpponent);
+		}
 		
 		opponentDivs.push({ });
 		for (var userID in currentUsersInRace) {
@@ -364,8 +425,11 @@ socket.on("after_quit_race", function(raceID) {
 	$("#usertextbox").val("");
 	$("#usertextbox").prop("disabled", true);
 	$("#usertextbox").removeClass("wrongLine");
-	$("#btnRequestRace").prop("disabled", false);
+	$("#usertextbox").removeAttr("placeholder");
+	$("#btnFindRace").prop("disabled", false);
+	$("#btnFindRace").show();
 	$("#btnQuitRace").prop("disabled", true);
+	$("#btnQuitRace").hide();
 	$("#codebox").empty();
 });
 
@@ -383,7 +447,7 @@ socket.on("force_refresh", function(msg) {
 	location.reload();
 });
 
-$("#btnRequestRace").click(function() {
+$("#btnFindRace").click(function() {
 	socket.emit("race_request", currentUserID);
 });
 
