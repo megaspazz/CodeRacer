@@ -434,7 +434,7 @@ socket.on("after_quit_race", function(raceID) {
 });
 
 socket.on("connect_error", function() {
-	alert("top kek, the server died so auto refresh to kill ur client, pls check back l8r :/");
+	alert("You have disconnected from the server.  Check your internet connection and refresh the page.  If that doesn't work, it's possible that the server is temporarily down for maintenance.");
 	location.reload();
 });
 
