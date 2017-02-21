@@ -12,3 +12,4 @@
 * Implement login sessions.
 * Make password storage not terrible.  We could also give a warning when registering that it's not secure for now.
 * Create a new event for when a race times out so that clients will know when they timed out, since the server currently just deletes the race from memory when it times out.
+* Practice mode (single-player)
