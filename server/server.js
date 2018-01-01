@@ -142,7 +142,7 @@ function getProgressUpdateFunction(raceID) {
 			serverLog("PRETTY SERIOUS ERROR!  Interval is stuck infinite looping!");
 			return;
 		}
-		serverLog("sending progress");
+		serverLog("sending progress to " + raceID);
 		let race = activeRaces[raceID];
 		let now = Date.now();
 		let elapsedTime = now - race.startTime;
@@ -217,7 +217,7 @@ function completeRace(raceID) {
 
 	// end of saving into database
 
-	serverLog("*** " + raceID + " ALL DONE ***");
+	serverLog("completed race " + raceID);
 	for (let id in activeRaces[raceID].users) {
 		let user = activeRaces[raceID].users[id];
 		let userProgresses = getUserProgresses(raceID);
