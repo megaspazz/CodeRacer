@@ -5,7 +5,7 @@ var app = express();
 var http = require("http").Server(app);
 var io = require("socket.io")(http);
 
-var fs = require("fs");						// filesystem
+var fs = require("fs");
 
 const UserStates = {
 	NONE: 0,
@@ -49,7 +49,13 @@ http.listen(PORT, function() {
 });
 
 
-
+/**
+ * Pads the input string with the specified character to the desired length.
+ * 
+ * @param {*} orig the text to pad
+ * @param {*} padChar the character used to pad
+ * @param {*} targetLen the desired new length of the string
+ */
 function padLeft(orig, padChar, targetLen) {
 	let str = String(orig);
 	let padLen = targetLen - str.length;
@@ -59,6 +65,12 @@ function padLeft(orig, padChar, targetLen) {
 	return padChar.repeat(padLen) + str;
 }
 
+/**
+ * Formats the input date as a string.
+ * 
+ * @param {Date} dateTime the date to format
+ * @returns {string} the formatted date
+ */
 function getDateTimeDisplay(dateTime) {
 	let yr = padLeft(dateTime.getFullYear(), "0", 4);
 	let mo = padLeft(dateTime.getMonth() + 1, "0", 2);
@@ -70,10 +82,22 @@ function getDateTimeDisplay(dateTime) {
 	return mo + "/" + dt + "/" + yr + " " + hr + ":" + mn + ":" + sc + "." + ms;
 }
 
+/**
+ * Logs the message in the server.
+ * 
+ * @param {string} msg the message to log.
+ */
 function serverLog(msg) {
 	console.log("[" + getDateTimeDisplay(new Date()) + "] " + msg);
 }
 
+/**
+ * Gets the progresses of each user in the specified race.
+ * 
+ * @param {*} raceID the id of the race to retrieve data from
+ * @returns {*} an object mapping from userID to progress, where progress is an object containing
+ *              currentLine, totalLines, maxLinePos, numCorrectKeys, numWrongKeys.
+ */
 function getUserProgresses(raceID) {
 	let userProgresses = { };
 	for (let userID in activeRaces[raceID].users) {
@@ -82,25 +106,11 @@ function getUserProgresses(raceID) {
 	return userProgresses;
 }
 
-function getRaceStateFunction(raceID, userID) {
-	return function() {
-		let user = activeRaces[raceID].users[userID];
-		
-	}
-}
-
-function getStartRaceFunction_OLD(raceID, userID) {
-	return function() {
-		if (activeRaces[raceID]) {
-			let user = activeRaces[raceID].users[userID];
-			if (user && user.state === UserStates.STARTING) {
-				user.state = UserStates.STARTED;
-				user.connection.emit("start_race", raceID, activeRaces[raceID].raceText);
-			}
-		}
-	}
-}
-
+/**
+ * Returns the function that starts a race.
+ * 
+ * @param {*} raceID the race to start.
+ */
 function getStartRaceFunction(raceID) {
 	return function() {
 		if (activeRaces[raceID]) {
@@ -112,11 +122,18 @@ function getStartRaceFunction(raceID) {
 				}
 			}
 			let progressUpdateFcn = getProgressUpdateFunction(raceID);
-			activeRaces[raceID].updateIntervalID = setInterval(progressUpdateFcn, UPDATE_INTERVAL_TIME);
+			activeRaces[raceID].updateIntervalID = (
+				setInterval(progressUpdateFcn, UPDATE_INTERVAL_TIME)
+			);
 		}
 	}
 }
 
+/**
+ * Returns the function that updates the race progress.
+ * 
+ * @param {*} raceID the race whose progress is being updated
+ */
 function getProgressUpdateFunction(raceID) {
 	return function() {
 		if (!activeRaces[raceID]) {
@@ -134,8 +151,11 @@ function getProgressUpdateFunction(raceID) {
 		if (elapsedTime > MAX_RACE_TIME) {
 			for (let userID in race.users) {
 				let user = race.users[userID];
-				// kick the users who aren't done yet, although they can probably only be in STARTED state at this point
-				if (user.state === UserStates.NONE || user.state === UserStates.STARTING || user.state === UserStates.STARTED) {
+				// kick the users who aren't done yet, although they can probably only be in STARTED
+				// state at this point
+				if (user.state === UserStates.NONE
+					|| user.state === UserStates.STARTING
+					|| user.state === UserStates.STARTED) {
 					user.state = UserStates.TIMEOUT;
 				}
 			}
@@ -152,12 +172,20 @@ function getProgressUpdateFunction(raceID) {
 	}
 }
 
+/**
+ * Checks if the race has been completed.
+ * 
+ * @param {*} raceID the race to check for completion
+ * @returns {Boolean} whether or not the race has been completed
+ */
 function checkRaceCompleted(raceID) {
 	let done = true;
 	for (let id in activeRaces[raceID].users) {
 		let userState = activeRaces[raceID].users[id].state;
 		// is might be better to say that it's not FINISHED or QUIT
-		if (userState === UserStates.NONE || userState === UserStates.STARTING || userState === UserStates.STARTED) {
+		if (userState === UserStates.NONE
+			|| userState === UserStates.STARTING
+			|| userState === UserStates.STARTED) {
 			done = false;
 			break;
 		}
@@ -168,13 +196,17 @@ function checkRaceCompleted(raceID) {
 	return done;
 }
 
+/**
+ * Finishes the given race, performing the necessary cleanup work and adding the race to the
+ * database.
+ * 
+ * @param {*} raceID the id of the race that was completed
+ */
 function completeRace(raceID) {
 	// stop the progress update interval
-	
 	clearInterval(activeRaces[raceID].updateIntervalID);
 	
-	// robon saves match into history table
-
+	// TODO: robon saves match into history table
 	let statsMap = { };
 
 	for (let id in activeRaces[raceID].users) {
@@ -194,11 +226,22 @@ function completeRace(raceID) {
 	delete activeRaces[raceID];
 }
 
+/**
+ * Checks whether or not the specified race has started.
+ * 
+ * @param {*} raceID the id of the race to check
+ */
 function checkRaceStarted(raceID) {
 	let currTime = Date.now();
-	return activeRaces[raceID] && activeRaces[raceID].startTime && currTime > activeRaces[raceID].startTime;
+	return (activeRaces[raceID] && activeRaces[raceID].startTime
+		&& currTime > activeRaces[raceID].startTime);
 }
 
+/**
+ * Returns the users in the specified race.
+ * 
+ * @param {*} raceID the id of the race to check
+ */
 function getUsersInRace(raceID) {
 	let usersInRace = [];
 	for (let userID in activeRaces[raceID].users) {
@@ -214,15 +257,15 @@ io.on("connection", function(socket) {
 	socket.on("race_request", function(userID) {
 		serverLog("got race request");
 
-		// begin rodger's trollerino
-		
+		// section below: search for a non-full room or create a new one if one doesn't exist
 		let raceID;
 		let foundRace = false;
 
 		for (let activeRaceID in activeRaces) {
-			// first line checks if there is a race that hasn't set a start time yet, so it has only one user
-			// second line checks if the race has more than the minimum amount of time before starting
-			// third line checks if the race has fewer than the maximum number of people in it
+			// first checks if there is a race that hasn't set a start time yet (i.e. there is
+		    //   only one user)
+			// then checks if the race has more than the minimum amount of time before starting
+			// then checks if the race has fewer than the maximum number of people in it
 			if ((activeRaces[activeRaceID].startTime == null ||
 					activeRaces[activeRaceID].startTime - Date.now() >= MIN_RACE_JOIN_TIME) &&
 					Object.keys(activeRaces[activeRaceID].users).length < MAX_RACE_SIZE) {
@@ -232,17 +275,14 @@ io.on("connection", function(socket) {
 			}
 		}
 
-		// if haven't found a race yet, start a new race (new raceID)
 		if (!foundRace) {
 			do {
-				raceID = Math.random().toString();  // generate ID until unique one, must be a string!
-			} while (activeRaces[raceID]);          // (that doesn't exist already) is found
+				raceID = Math.random().toString(); // generate a random ID
+			} while (activeRaces[raceID]);         // hope that it doesn't exist
 		}
 
-		// end rodger's trollerino
-
+		// generate a new race if necessary
 		if (!activeRaces[raceID]) {
-			// actually get a random race text
 			let fileNames = fs.readdirSync(RACE_TEXTS_PATH);
 			let fileNum = ~~(Math.random() * fileNames.length);
 			let fullFilePath = path.join(RACE_TEXTS_PATH, fileNames[fileNum]);
@@ -269,7 +309,8 @@ io.on("connection", function(socket) {
 			var userState = activeRaces[raceID].users[userID].state;
 			switch (userState) {
 				case UserStates.QUIT:
-					socket.emit("error_message", "Cannot rejoin after quitting in the middle of a race.");
+					socket.emit("error_message",
+						"Cannot rejoin after quitting in the middle of a race.");
 					break;
 				case UserStates.FINISHED:
 					socket.emit("error_message", "Already finished the requested race.");
@@ -288,13 +329,12 @@ io.on("connection", function(socket) {
 
 		socket.emit("found_race", raceID);
 		activeRaces[raceID].users[userID] = {
-			name: userID,    // make this the actual display name
+			name: userID,    // TODO: make this the actual display name
 			connection: socket,
 			progress: null,
 			state: UserStates.NONE,
 			finishTime: NaN
 		}
-		serverLog(Object.keys(activeRaces[raceID].users).length);
 		if (Object.keys(activeRaces[raceID].users).length >= 2) {
 			if (!activeRaces[raceID].startTime) {
 				let now = Date.now();
@@ -312,8 +352,6 @@ io.on("connection", function(socket) {
 					user.state = UserStates.STARTING;
 					let now = Date.now();
 					let remainingTime = Math.max(0, activeRaces[raceID].startTime - now);
-					//let startRaceFn = getStartRaceFunction(raceID, userID);
-					//setTimeout(startRaceFn, remainingTime);
 					serverLog("remaining time = " + remainingTime);
 					user.connection.emit("start_race_timer", raceID, remainingTime, usersInRace);
 				} else if (user.state === UserStates.STARTING) {
@@ -327,14 +365,12 @@ io.on("connection", function(socket) {
 		serverLog("got progress report from " + userID);
 		if (!activeRaces[raceID] || !activeRaces[raceID].users[userID]) {
 			serverLog("warning: report for dead race.");
-			socket.emit("force_refresh", "Tried to play a nonexistent race... try refreshing the webpage.");
+			socket.emit("force_refresh",
+				"Tried to play a nonexistent race... try refreshing the webpage.");
 			return;
 		}
 
 		activeRaces[raceID].users[userID].progress = progress;
-		
-		//let userProgresses = getUserProgresses(raceID);
-		//socket.emit("race_state", raceID, userProgresses);
 	});
 
 	socket.on("disconnect", function() {
@@ -344,7 +380,8 @@ io.on("connection", function(socket) {
 	socket.on("quit_race", function(raceID, userID) {
 		serverLog("user " + userID + " quitting race " + raceID);
 		
-		// let the user know that they quit the race, even if it was non-existent or if they didn't belong to the race
+		// let the user know that they quit the race, even if it was non-existent or if they didn't
+		// belong to the race
 		socket.emit("after_quit_race", raceID);
 		
 		if (activeRaces[raceID]) {
@@ -355,7 +392,9 @@ io.on("connection", function(socket) {
 				// sometimes the server had to restart, so people might quit nonexistent races
 				// in this case we will just let them know that they quit
 				if (!user) {
-					serverLog("warning: unregistered user " + userID  + " tried to quit race " + raceID);
+					serverLog(
+						"warning: unregistered user " + userID  + " tried to quit race " + raceID
+					);
 				}
 				
 				// if the user didn't finish the race we should record it in the stats
@@ -369,7 +408,8 @@ io.on("connection", function(socket) {
 					delete activeRaces[raceID].users[userID];
 					let done = checkRaceCompleted(raceID);
 					if (!done) {
-						// if the race isn't over, update the list of racers for those still in the race
+						// if the race isn't over, update the list of racers for those still in the
+						// race
 						let usersInRace = getUsersInRace(raceID);
 						for (let userID in activeRaces[raceID].users) {
 							let user = activeRaces[raceID].users[userID];
@@ -387,7 +427,8 @@ io.on("connection", function(socket) {
 		serverLog("race finished");
 		// sometimes the server had to restart, so people might be on zombie races
 		if (!activeRaces[raceID] || !activeRaces[raceID].users[userID]) {
-			socket.emit("force_refresh", "Tried to finish a nonexistent race... try refreshing the webpage.");
+			socket.emit("force_refresh",
+				"Tried to finish a nonexistent race... try refreshing the webpage.");
 			return;
 		}
 		
@@ -409,7 +450,8 @@ io.on("connection", function(socket) {
 		let cpm = progress.numCorrectKeys / duration * 60000;
 		
 		// calculate the accuracy
-		let accuracyRating = progress.numCorrectKeys / (progress.numCorrectKeys + progress.numWrongKeys);
+		let totalKeys = progress.numCorrectKeys + progress.numWrongKeys;
+		let accuracyRating = progress.numCorrectKeys / totalKeys;
 
 		let stats = {
 			time: duration,
@@ -425,7 +467,7 @@ io.on("connection", function(socket) {
 		checkRaceCompleted(raceID);
 	});
 
-	// BEGIN RANDO STUFF
+	// TODO: (?) BEGIN RANDO STUFF
 	socket.on("create_account", function(username, password, email, displayName) {
 		addUser(username, displayName, email, password);
 
